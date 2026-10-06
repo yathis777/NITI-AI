@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>NITI AI | AI Creator Marketplace</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- ================= NAVBAR ================= -->
+
+    <header class="navbar">
+
+        <div class="logo">
+
+            <!-- Dolphin Logo -->
+            <div class="dolphin-logo">
+                <svg viewBox="0 0 100 70"
+                     xmlns="http://www.w3.org/2000/svg">
+
+                    <path
+                        d="M12 42
+                           C18 18, 45 8, 67 20
+                           C78 26, 84 36, 92 38
+                           C82 45, 69 46, 58 42
+                           C49 57, 30 61, 12 42Z"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"/>
+
+                    <path
+                        d="M61 20
+                           C57 10, 61 4, 70 2
+                           C72 10, 69 16, 61 20Z"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="5"
+                        stroke-linecap="round"/>
+
+                    <circle
+                        cx="69"
+                        cy="25"
+                        r="2.5"
+                        fill="currentColor"/>
+                </svg>
+            </div>
+
+            <span class="niti-text">NITI</span>
+            <span class="ai-text">AI</span>
+
+        </div>
+
+
+        <nav class="nav-links">
+
+            <a href="#home">Home</a>
+
+            <a href="#creators">Creators</a>
+
+            <a href="#how-it-works">How It Works</a>
+
+            <a href="#about">About</a>
+
+        </nav>
+
+
+        <button
+            class="login-btn"
+            onclick="openLogin()">
+
+            Login
+
+        </button>
+
+    </header>
+
+
+
+    <!-- ================= HERO SECTION ================= -->
+
+    <main>
+
+        <section
+            class="hero"
+            id="home">
+
+            <div class="hero-content">
+
+                <div class="hero-badge">
+                    ✨ AI-Powered Creator Marketplace
+                </div>
+
+                <h1>
+                    Find the perfect
+                    <span>AI Creator</span>
+                    for your brand.
+                </h1>
+
+                <p>
+                    NITI AI connects brands with talented AI creators
+                    using intelligent matching, portfolios and project briefs.
+                </p>
+
+
+                <div class="hero-buttons">
+
+                    <button
+                        class="primary-btn"
+                        onclick="findCreators()">
+
+                        Find Creators →
+                    </button>
+
+
+                    <button
+                        class="secondary-btn"
+                        onclick="showBrief()">
+
+                        Post a Brief
+                    </button>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- AI MATCHING CARD -->
+
+            <div class="ai-card">
+
+                <div class="ai-card-icon">
+                    🐬
+                </div>
+
+                <h3>
+                    AI Matching
+                </h3>
+
+                <p>
+                    Finding creators based on your project requirements.
+                </p>
+
+
+                <div class="match-percentage">
+                    94%
+                </div>
+
+
+                <div class="progress-container">
+
+                    <div
+                        class="progress-bar"
+                        id="matchProgress">
+                    </div>
+
+                </div>
+
+
+                <small>
+                    Match accuracy
+                </small>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================= STATS ================= -->
+
+        <section class="stats">
+
+            <div class="stat">
+
+                <h2 id="statCreators">
+                    10K+
+                </h2>
+
+                <p>
+                    AI Creators
+                </p>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h2 id="statBrands">
+                    2.5K+
+                </h2>
+
+                <p>
+                    Brands
+                </p>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h2 id="statProjects">
+                    15K+
+                </h2>
+
+                <p>
+                    Projects
+                </p>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h2 id="statAccuracy">
+                    94%
+                </h2>
+
+                <p>
+                    Match Accuracy
+                </p>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================= CREATORS ================= -->
+
+        <section
+            class="creators-section"
+            id="creators">
+
+            <div class="section-heading">
+
+                <span>
+                    DISCOVER TALENT
+                </span>
+
+                <h2>
+                    Featured AI Creators
+                </h2>
+
+                <p>
+                    Discover talented creators ready to bring
+                    your next idea to life.
+                </p>
+
+            </div>
+
+
+            <!-- SEARCH -->
+
+            <div class="creator-search">
+
+                <input
+                    type="text"
+                    id="creatorSearch"
+                    placeholder="🔍 Search creators..."
+                    oninput="searchCreators(this.value)">
+
+            </div>
+
+
+
+            <div class="creator-grid">
+
+
+                <!-- CREATOR 1 -->
+
+                <div
+                    class="creator-card"
+                    data-creator="Arjun AI Studio">
+
+                    <div class="creator-avatar">
+                        AS
+                    </div>
+
+                    <button
+                        class="favorite-btn" data-creator="Arjun AI Studio" onclick="favoriteCreator('Arjun AI Studio', this)">
+
+                        ♡
+                    </button>
+
+                    <h3>
+                        Arjun AI Studio
+                    </h3>
+
+                    <p class="creator-role">
+                        AI Video Creator
+                    </p>
+
+
+                    <div class="creator-tags">
+
+                        <span>AI Video</span>
+                        <span>Reels</span>
+                        <span>Ads</span>
+
+                    </div>
+
+
+                    <div class="creator-bottom">
+
+                        <span>
+                            ⭐ 4.9
+                        </span>
+
+                        <button
+                            onclick="viewCreator('Arjun AI Studio')">
+
+                            View Profile
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- CREATOR 2 -->
+
+                <div
+                    class="creator-card"
+                    data-creator="Maya Creative">
+
+                    <div class="creator-avatar">
+                        MC
+                    </div>
+
+                    <button
+                        class="favorite-btn" data-creator="Maya Creative" onclick="favoriteCreator('Maya Creative', this)">
+
+                        ♡
+                    </button>
+
+                    <h3>
+                        Maya Creative
+                    </h3>
+
+                    <p class="creator-role">
+                        AI Image Creator
+                    </p>
+
+
+                    <div class="creator-tags">
+
+                        <span>AI Art</span>
+                        <span>Branding</span>
+                        <span>Design</span>
+
+                    </div>
+
+
+                    <div class="creator-bottom">
+
+                        <span>
+                            ⭐ 4.8
+                        </span>
+
+                        <button
+                            onclick="viewCreator('Maya Creative')">
+
+                            View Profile
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- CREATOR 3 -->
+
+                <div
+                    class="creator-card"
+                    data-creator="Pixel Gen AI">
+
+                    <div class="creator-avatar">
+                        PG
+                    </div>
+
+                    <button
+                        class="favorite-btn" data-creator="Pixel Gen AI" onclick="favoriteCreator('Pixel Gen AI', this)">
+
+                        ♡
+                    </button>
+
+                    <h3>
+                        Pixel Gen AI
+                    </h3>
+
+                    <p class="creator-role">
+                        AI Content Creator
+                    </p>
+
+
+                    <div class="creator-tags">
+
+                        <span>Ads</span>
+                        <span>Social Media</span>
+                        <span>Content</span>
+
+                    </div>
+
+
+                    <div class="creator-bottom">
+
+                        <span>
+                            ⭐ 4.9
+                        </span>
+
+                        <button
+                            onclick="viewCreator('Pixel Gen AI')">
+
+                            View Profile
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- CREATOR 4 -->
+
+                <div
+                    class="creator-card"
+                    data-creator="Vision AI Labs">
+
+                    <div class="creator-avatar">
+                        VA
+                    </div>
+
+                    <button
+                        class="favorite-btn" data-creator="Vision AI Labs" onclick="favoriteCreator('Vision AI Labs', this)">
+
+                        ♡
+                    </button>
+
+                    <h3>
+                        Vision AI Labs
+                    </h3>
+
+                    <p class="creator-role">
+                        AI Advertisement Creator
+                    </p>
+
+
+                    <div class="creator-tags">
+
+                        <span>AI Ads</span>
+                        <span>Marketing</span>
+                        <span>Video</span>
+
+                    </div>
+
+
+                    <div class="creator-bottom">
+
+                        <span>
+                            ⭐ 4.7
+                        </span>
+
+                        <button
+                            onclick="viewCreator('Vision AI Labs')">
+
+                            View Profile
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================= HOW IT WORKS ================= -->
+
+        <section
+            class="how-section"
+            id="how-it-works">
+
+            <div class="section-heading">
+
+                <span>
+                    SIMPLE PROCESS
+                </span>
+
+                <h2>
+                    How NITI AI Works
+                </h2>
+
+            </div>
+
+
+            <div class="steps">
+
+
+                <div class="step">
+
+                    <div class="step-number">
+                        01
+                    </div>
+
+                    <h3>
+                        Create a Brief
+                    </h3>
+
+                    <p>
+                        Tell us about your project,
+                        requirements and budget.
+                    </p>
+
+                </div>
+
+
+
+                <div class="step">
+
+                    <div class="step-number">
+                        02
+                    </div>
+
+                    <h3>
+                        AI Finds Matches
+                    </h3>
+
+                    <p>
+                        Our AI analyzes your requirements
+                        and finds suitable creators.
+                    </p>
+
+                </div>
+
+
+
+                <div class="step">
+
+                    <div class="step-number">
+                        03
+                    </div>
+
+                    <h3>
+                        Connect & Create
+                    </h3>
+
+                    <p>
+                        Connect with your selected creator
+                        and start your project.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================= ABOUT ================= -->
+
+        <section
+            class="about-section"
+            id="about">
+
+            <div class="about-content">
+
+                <span>
+                    ABOUT NITI AI
+                </span>
+
+                <h2>
+                    Where AI talent meets
+                    ambitious brands.
+                </h2>
+
+                <p>
+                    NITI AI makes it easier for brands and creative
+                    agencies to discover, evaluate and collaborate
+                    with skilled AI creators.
+                </p>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================= CTA ================= -->
+
+        <section class="cta-section">
+
+            <h2>
+                Ready to create something amazing?
+            </h2>
+
+            <p>
+                Find the right AI creator for your next project.
+            </p>
+
+            <button
+                class="primary-btn"
+                onclick="findCreators()">
+
+                Start with NITI AI →
+            </button>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- ================= LOGIN MODAL ================= -->
+
+    <div
+        id="loginModal"
+        class="login-modal">
+
+        <div class="login-box">
+
+            <button
+                class="login-close"
+                onclick="closeLogin()">
+
+                ×
+
+            </button>
+
+
+            <div class="login-icon">
+                🐬
+            </div>
+
+
+            <h2>
+                Welcome to NITI AI
+            </h2>
+
+            <p>
+                Login to connect with AI creators
+            </p>
+
+
+            <input
+                type="email"
+                id="email"
+                placeholder="Enter your email">
+
+
+            <input
+                type="password"
+                id="password"
+                placeholder="Enter your password">
+
+
+            <button
+                class="login-submit" id="loginSubmit"
+                onclick="login()">
+
+                Login
+
+            </button>
+            <button
+                class="auth-mode-toggle"
+                id="authModeToggle"
+                type="button"
+                onclick="toggleAuthMode()">
+                New here? Create an account
+            </button>
+
+
+            <p
+                id="loginMessage"
+                class="login-message">
+            </p>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- JAVASCRIPT -->
+
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
