@@ -8,4 +8,3 @@ const firebaseConfig = {
 };
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 window.nitiAuth = firebase.auth();
-window.nitiDb = firebase.firestore();
