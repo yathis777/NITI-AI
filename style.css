@@ -318,6 +318,14 @@ button {
     margin: 0 auto 40px;
 }
 
+.creator-search-results {
+    min-height: 24px;
+    margin: 10px 20px 0;
+    color: #94a3b8;
+    font-size: 14px;
+    text-align: center;
+}
+
 .creator-search input {
     width: 100%;
     padding: 15px 20px;
@@ -400,7 +408,218 @@ button {
 
 .favorite-btn:hover {
     color: #ff4d6d;
-    border-color: #ff4d6d;
+    border-    color: #ff4d6d;
+}
+
+.niti-chat {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 1000001;
+}
+
+.niti-chat-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #00d9ff, #4d7cff);
+    color: #07111f;
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.niti-chat-toggle span:first-child {
+    font-size: 20px;
+}
+
+.niti-chat-panel {
+    position: absolute;
+    right: 0;
+    bottom: 70px;
+    display: flex;
+    flex-direction: column;
+    width: 350px;
+    max-width: calc(100vw - 32px);
+    height: 440px;
+    max-height: calc(100vh - 120px);
+    overflow: hidden;
+    border: 1px solid rgba(0, 217, 255, 0.3);
+    border-radius: 18px;
+    background: #0d1828;
+    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.5);
+}
+
+.niti-chat-panel[hidden] {
+    display: none;
+}
+
+.niti-chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    background: #111d2e;
+}
+
+.niti-chat-header strong,
+.niti-chat-header span {
+    display: block;
+}
+
+.niti-chat-header strong {
+    color: #00d9ff;
+}
+
+.niti-chat-header span {
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.niti-chat-close {
+    border: 0;
+    background: transparent;
+    color: #cbd5e1;
+    font-size: 26px;
+}
+
+.niti-chat-messages {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.niti-chat-bubble {
+    max-width: 90%;
+    margin: 0;
+    padding: 11px 13px;
+    border-radius: 14px;
+    color: #e2e8f0;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+.niti-chat-bubble.assistant {
+    align-self: flex-start;
+    background: #17263a;
+}
+
+.niti-chat-bubble.user {
+    align-self: flex-end;
+    background: #075d79;
+}
+
+.niti-chat-sources {
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-width: 90%;
+    padding: 10px 13px;
+    border-radius: 12px;
+    background: #111d2e;
+    font-size: 12px;
+}
+
+.niti-chat-sources strong {
+    color: #94a3b8;
+}
+
+.niti-chat-sources a {
+    color: #00d9ff;
+    overflow-wrap: anywhere;
+}
+
+.niti-chat-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 12px 10px;
+}
+
+.niti-chat-actions button {
+    padding: 7px 10px;
+    border: 1px solid #334155;
+    border-radius: 999px;
+    background: transparent;
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.niti-chat-actions button:first-child {
+    border-color: rgba(0, 217, 255, 0.4);
+    color: #00d9ff;
+}
+
+.niti-chat-consent {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 0 14px 10px;
+    color: #94a3b8;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.niti-chat-consent input {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    accent-color: #00d9ff;
+}
+
+.niti-chat-form {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.niti-chat-form input {
+    min-width: 0;
+    flex: 1;
+    padding: 11px 13px;
+    border: 1px solid #334155;
+    border-radius: 999px;
+    outline: none;
+    background: #111d2e;
+    color: white;
+}
+
+.niti-chat-form input:focus {
+    border-color: #00d9ff;
+}
+
+.niti-chat-form button {
+    padding: 0 16px;
+    border: 0;
+    border-radius: 999px;
+    background: #00d9ff;
+    color: #07111f;
+    font-weight: 700;
+}
+
+.niti-chat-form button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+@media (max-width: 450px) {
+    .niti-chat {
+        right: 16px;
+        bottom: 16px;
+    }
+
+    .niti-chat-panel {
+        right: -8px;
+        width: calc(100vw - 32px);
+    }
 }
 
 .creator-card h3 {
@@ -1049,4 +1268,3 @@ button {
     background: rgba(0, 217, 255, 0.12);
     transform: translateY(-1px);
 }
-

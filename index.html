@@ -263,8 +263,13 @@
                 <input
                     type="text"
                     id="creatorSearch"
-                    placeholder="🔍 Search creators..."
+                    aria-label="Search creators by name, skill, role, or city"
+                    placeholder="🔍 Search by name, skill, role, or city..."
                     oninput="searchCreators(this.value)">
+
+                <p id="creatorSearchResults" class="creator-search-results" role="status" aria-live="polite">
+                    Showing all 4 creators.
+                </p>
 
             </div>
 
@@ -691,12 +696,43 @@
     </div>
 
 
+    <section class="niti-chat" aria-label="NITI AI assistant">
+        <div class="niti-chat-panel" id="nitiChatPanel" hidden>
+            <div class="niti-chat-header">
+                <div>
+                    <strong>NITI AI Assistant</strong>
+                    <span>Ask questions and search the web</span>
+                </div>
+                <button class="niti-chat-close" type="button" aria-label="Close chat" onclick="toggleNitiChat(false)">×</button>
+            </div>
+            <div class="niti-chat-messages" id="nitiChatMessages" role="log" aria-live="polite">
+                <p class="niti-chat-bubble assistant">Hi! 👋 Ask me anything. Turn on AI search below to get a generated answer with web sources. Your chat is not saved.</p>
+            </div>
+            <div class="niti-chat-actions">
+                <button type="button" onclick="startMedicalReport()">Start medical report helper</button>
+                <button type="button" onclick="clearNitiChat()">Clear chat</button>
+            </div>
+            <label class="niti-chat-consent">
+                <input id="nitiAiEnabled" type="checkbox">
+                <span>Enable AI web search. Your messages will be sent to the configured AI provider. Avoid sensitive personal or medical details.</span>
+            </label>
+            <form class="niti-chat-form" onsubmit="sendNitiChatMessage(event)">
+                <input id="nitiChatInput" type="text" maxlength="2000" placeholder="Ask anything..." aria-label="Type a message" autocomplete="off" required>
+                <button id="nitiChatSend" type="submit" aria-label="Send message">Send</button>
+            </form>
+        </div>
+        <button class="niti-chat-toggle" id="nitiChatToggle" type="button" aria-label="Open NITI AI chat" aria-expanded="false" aria-controls="nitiChatPanel" onclick="toggleNitiChat()">
+            <span aria-hidden="true">💬</span>
+            <span>Chat with NITI AI</span>
+        </button>
+    </section>
+
+
 
     <!-- JAVASCRIPT -->
 
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>
 
