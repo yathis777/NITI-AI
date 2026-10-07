@@ -20,3 +20,21 @@ The website keeps Firebase Authentication for account sign-in. MongoDB stores th
 3. Restart with `npm.cmd start`, sign into NITI AI, open the chat, and explicitly enable **AI search** before asking a question. Answers are generated server-side and may include web citations.
 
 AI chat is disabled until a key is configured and the user opts in. Chat messages are sent to the configured AI provider only after opt-in and are not saved by this app. The medical-report helper remains browser-only and does not send its step-by-step answers to the AI provider. Do not submit sensitive personal or medical information to AI chat. Provider usage may incur charges.
+
+## Run with Docker
+
+The existing Docker image serves the static Firebase Hosting site from `public/` using Nginx. Build it from the repository root:
+
+```sh
+docker build -t niti-ai .
+```
+
+Start it on port 8080:
+
+```sh
+docker run --rm -p 8080:80 niti-ai
+```
+
+Open <http://localhost:8080>. This static deployment uses the files in `public/` and Firebase services; it does not run the root Node/MongoDB API. Use the Node.js instructions above to run the current MongoDB-backed app and AI chat.
+
+Firebase Hosting is also configured to serve `public/`. It remains the older static Firebase build; it does not proxy requests to the Node/MongoDB or AI backend.

@@ -1,5 +1,17 @@
+# Local secrets and environment files
 .env
 .env.*
 !.env.example
-node_modules/
 firebase-service-account.json
+
+# Dependencies and generated output
+node_modules/
+.firebase/
+logs/
+*.log
+*.tgz
+coverage/
+.nyc_output/
+
+# Firebase deployment config can contain project-specific settings
+# .firebaserc
