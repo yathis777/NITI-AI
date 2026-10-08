@@ -23,6 +23,15 @@ node serve-local.js
 
 Open <http://localhost:5500/public/index.html>. To run the full Express/MongoDB app instead, configure the private environment values described in **Run with MongoDB**, install dependencies with `npm.cmd install`, and run `npm.cmd start`; the Express app serves the same root CSV endpoint.
 
+If port `5500` is already in use, stop the other server or choose another port in PowerShell:
+
+```powershell
+$env:PORT=5501
+node serve-local.js
+```
+
+Then open <http://localhost:5501/public/index.html>.
+
 Edit only `data/creators.csv`. Run `npm.cmd run prepare:hosting-data` to generate the static hosting copy at `public/data/creators.csv` when preparing another static bundle. Firebase Hosting runs this sync automatically before deploy. The Docker image copies the root CSV into its Nginx document root.
 
 ## Optional AI web search chat
