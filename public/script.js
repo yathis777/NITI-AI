@@ -1355,6 +1355,7 @@ async function favoriteCreator(name, button) {
 
 async function contactCreator(name, button) {
     const status = document.getElementById("profileActionStatus");
+    const buttonLabel = button ? button.textContent : "";
     if (!currentNitiUser) {
         closeProfile();
         showNotification("Login required", "Please log in to contact a creator.");
@@ -1396,9 +1397,10 @@ async function contactCreator(name, button) {
         const currentStatus = document.getElementById("profileActionStatus");
         if (currentStatus) currentStatus.textContent = `Could not save request: ${error.code || error.message}`;
         else showNotification("Could not save request", error.code || "Please try again.");
+    } finally {
         if (button) {
             button.disabled = false;
-            button.textContent = "Request an engagement";
+            button.textContent = buttonLabel;
         }
     }
 }
