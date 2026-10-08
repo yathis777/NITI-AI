@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>NITI AI | Admin dashboard</title>
+    <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+    <main class="admin-shell">
+        <header class="topbar">
+            <a class="brand" href="/" aria-label="NITI AI home"><span>NITI</span><strong>AI</strong></a>
+            <span class="secure-label"><span aria-hidden="true">●</span> Private admin area</span>
+        </header>
+
+        <section class="intro">
+            <p class="eyebrow">NITI AI · ADMIN</p>
+            <h1>Customer activity</h1>
+            <p>Review saved creator requests and project briefs. Access is checked by the server for every data request.</p>
+        </section>
+
+        <section class="panel login-panel" id="loginPanel">
+            <h2>Sign in to continue</h2>
+            <p>Use the Firebase account whose UID is configured as an administrator.</p>
+            <form id="loginForm">
+                <label for="adminEmail">Email address</label>
+                <input id="adminEmail" name="email" type="email" autocomplete="username" required>
+                <label for="adminPassword">Password</label>
+                <input id="adminPassword" name="password" type="password" autocomplete="current-password" required>
+                <button class="button primary" id="loginButton" type="submit">Sign in</button>
+            </form>
+            <div class="login-divider"><span>or</span></div>
+            <button class="button google-button" id="googleLoginButton" type="button">Continue with Google</button>
+            <p class="message" id="loginMessage" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="dashboard" id="dashboard" hidden>
+            <div class="toolbar panel">
+                <div>
+                    <p class="eyebrow">SIGNED IN</p>
+                    <p class="account" id="accountLabel"></p>
+                </div>
+                <div class="toolbar-actions">
+                    <button class="button secondary" id="refreshButton" type="button">Refresh</button>
+                    <button class="button quiet" id="signOutButton" type="button">Sign out</button>
+                </div>
+            </div>
+
+            <p class="message page-message" id="dashboardMessage" role="status" aria-live="polite"></p>
+            <p class="source-note" id="sourceNote">Showing up to the latest 200 records per collection. Source: Firestore.</p>
+
+            <div class="summary-grid" aria-label="Saved record counts">
+                <article class="summary-card"><span>Contact requests</span><strong id="contactCount">—</strong></article>
+                <article class="summary-card"><span>Project briefs</span><strong id="briefCount">—</strong></article>
+            </div>
+
+            <section class="data-section panel" aria-labelledby="contactsHeading">
+                <div class="section-heading">
+                    <div><p class="eyebrow">CREATOR INTEREST</p><h2 id="contactsHeading">Contact requests</h2></div>
+                    <span class="section-count" id="contactSectionCount">—</span>
+                </div>
+                <div class="record-list" id="contactList" aria-live="polite">
+                    <p class="state">Sign in to load records.</p>
+                </div>
+            </section>
+
+            <section class="data-section panel" aria-labelledby="briefsHeading">
+                <div class="section-heading">
+                    <div><p class="eyebrow">PROJECT DETAILS</p><h2 id="briefsHeading">Project briefs</h2></div>
+                    <span class="section-count" id="briefSectionCount">—</span>
+                </div>
+                <div class="record-list" id="briefList" aria-live="polite">
+                    <p class="state">Sign in to load records.</p>
+                </div>
+            </section>
+        </section>
+
+        <footer>Customer email is read from Firebase Authentication when available. Records display their source and Firebase user ID.</footer>
+    </main>
+
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+    <script src="/firebase-config.js"></script>
+    <script src="/admin.js"></script>
+</body>
+</html>

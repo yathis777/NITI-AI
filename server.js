@@ -5,8 +5,13 @@ const express = require("express");
 const { MongoClient } = require("mongodb");
 const { applicationDefault, initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
+const { getFirestore } = require("firebase-admin/firestore");
+const { isConfiguredAdmin } = require("./admin-access");
 
-const requiredEnvironment = ["MONGODB_URI", "MONGODB_DB", "GOOGLE_APPLICATION_CREDENTIALS"];
+const adminDashboardOnly = process.env.ADMIN_DASHBOARD_ONLY === "true";
+const requiredEnvironment = adminDashboardOnly
+    ? ["GOOGLE_APPLICATION_CREDENTIALS", "ADMIN_UIDS"]
+    : ["MONGODB_URI", "MONGODB_DB", "GOOGLE_APPLICATION_CREDENTIALS"];
 const missingEnvironment = requiredEnvironment.filter(name => !process.env[name]);
 if (missingEnvironment.length) {
     throw new Error(`Missing required environment variables: ${missingEnvironment.join(", ")}`);
@@ -16,11 +21,13 @@ initializeApp({
     credential: applicationDefault()
 });
 
-const mongoClient = new MongoClient(process.env.MONGODB_URI);
+const mongoClient = adminDashboardOnly ? null : new MongoClient(process.env.MONGODB_URI);
 const app = express();
 const staticFiles = new Map([
     ["/script.js", "script.js"],
     ["/style.css", "style.css"],
+    ["/admin.js", "admin.js"],
+    ["/admin.css", "admin.css"],
     ["/firebase-config.js", "firebase-config.js"],
     ["/creator-data.js", "public/creator-data.js"],
     ["/data/creators.csv", "data/creators.csv"]
@@ -60,9 +67,152 @@ async function requireFirebaseUser(req, res, next) {
     }
 }
 
+function requireAdmin(req, res, next) {
+    if (!isConfiguredAdmin(req.user.uid, process.env.ADMIN_UIDS)) {
+        res.status(403).json({ error: "This Firebase account is not configured as an administrator." });
+        return;
+    }
+    next();
+}
+
 function validString(value, maxLength) {
     return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
 }
+
+app.use("/api/admin", (req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    next();
+});
+
+app.use("/api", (req, res, next) => {
+    if (adminDashboardOnly && req.path !== "/admin/data") {
+        res.status(404).json({ error: "Only the admin dashboard API is available in admin-only mode." });
+        return;
+    }
+    next();
+});
+
+app.get("/api/admin/data", requireFirebaseUser, requireAdmin, async (req, res, next) => {
+    const recordLimit = 200;
+    const briefFields = [
+        "title", "brand", "goal", "description", "type", "visualStyle",
+        "visualReferences", "deliverables", "quantity", "format",
+        "targetPlatform", "requiredTools", "preferredTools", "deadline",
+        "budget", "commercialUseRequired", "usageDuration", "intendedChannels",
+        "selectedCreatorName"
+    ];
+    const mongoBriefProjection = Object.fromEntries([
+        "_id", "userId", "createdAt", ...briefFields
+    ].map(field => [field, 1]));
+
+    try {
+        const [mongoData, firestoreContacts, firestoreBriefs] = await Promise.all([
+            req.db
+                ? Promise.all([
+                    req.db.collection("contactRequests")
+                        .find({}, { projection: { _id: 1, userId: 1, creatorName: 1, createdAt: 1 } })
+                        .sort({ createdAt: -1 })
+                        .limit(recordLimit)
+                        .toArray(),
+                    req.db.collection("briefs")
+                        .find({}, { projection: mongoBriefProjection })
+                        .sort({ createdAt: -1 })
+                        .limit(recordLimit)
+                        .toArray()
+                ])
+                : Promise.resolve([[], []]),
+            getFirestore().collection("contactRequests")
+                .orderBy("createdAt", "desc")
+                .limit(recordLimit)
+                .get(),
+            getFirestore().collection("briefs")
+                .orderBy("createdAt", "desc")
+                .limit(recordLimit)
+                .get()
+        ]);
+        const [mongoContacts, mongoBriefs] = mongoData;
+
+        const contacts = [
+            ...mongoContacts.map(record => ({
+                id: String(record._id),
+                source: "MongoDB",
+                userId: record.userId,
+                creatorName: record.creatorName,
+                createdAt: record.createdAt
+            })),
+            ...firestoreContacts.docs.map(document => {
+                const record = document.data();
+                return {
+                    id: document.id,
+                    source: "Firestore",
+                    userId: record.userId,
+                    creatorName: record.creatorName,
+                    createdAt: record.createdAt
+                };
+            })
+        ];
+        const briefs = [
+            ...mongoBriefs.map(record => ({
+                ...Object.fromEntries(briefFields.map(field => [field, record[field]])),
+                id: String(record._id),
+                source: "MongoDB",
+                userId: record.userId,
+                createdAt: record.createdAt
+            })),
+            ...firestoreBriefs.docs.map(document => {
+                const record = document.data();
+                return {
+                    ...Object.fromEntries(briefFields.map(field => [field, record[field]])),
+                    id: document.id,
+                    source: "Firestore",
+                    userId: record.userId,
+                    createdAt: record.createdAt
+                };
+            })
+        ];
+
+        const userIds = [...new Set(
+            [...contacts, ...briefs]
+                .map(record => record.userId)
+                .filter(userId => typeof userId === "string" && userId)
+        )];
+        const profiles = new Map();
+        for (let index = 0; index < userIds.length; index += 100) {
+            const result = await getAuth().getUsers(userIds.slice(index, index + 100).map(uid => ({ uid })));
+            for (const user of result.users) {
+                profiles.set(user.uid, {
+                    email: user.email || "",
+                    displayName: user.displayName || ""
+                });
+            }
+        }
+
+        const decorateRecords = records => records
+            .map(record => {
+                const profile = profiles.get(record.userId);
+                const createdAt = record.createdAt && typeof record.createdAt.toDate === "function"
+                    ? record.createdAt.toDate()
+                    : record.createdAt;
+                const date = createdAt ? new Date(createdAt) : null;
+                return {
+                    ...record,
+                    userEmail: profile?.email || "",
+                    userDisplayName: profile?.displayName || "",
+                    createdAt: date && !Number.isNaN(date.getTime()) ? date.toISOString() : null
+                };
+            })
+            .sort((left, right) => (right.createdAt || "").localeCompare(left.createdAt || ""));
+
+        res.json({
+            contacts: decorateRecords(contacts),
+            briefs: decorateRecords(briefs),
+            limitPerCollectionPerStore: recordLimit,
+            sources: req.db ? ["Firestore", "MongoDB"] : ["Firestore"]
+        });
+    } catch (error) {
+        next(error);
+    }
+});
 
 app.get("/api/favorites", requireFirebaseUser, async (req, res, next) => {
     try {
@@ -303,7 +453,16 @@ app.use((error, req, res, next) => {
 });
 
 app.get("/", (req, res) => {
+    if (adminDashboardOnly) {
+        res.redirect(302, "/admin");
+        return;
+    }
     res.sendFile(path.join(__dirname, "index.html"));
+});
+
+app.get("/admin", (req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.sendFile(path.join(__dirname, "admin.html"));
 });
 
 app.get([...staticFiles.keys()], (req, res) => {
@@ -315,11 +474,18 @@ app.use((req, res) => {
 });
 
 async function start() {
-    await mongoClient.connect();
-    database = mongoClient.db(process.env.MONGODB_DB);
-    await database.collection("favorites").createIndex({ userId: 1, creatorName: 1 }, { unique: true });
+    if (mongoClient) {
+        await mongoClient.connect();
+        database = mongoClient.db(process.env.MONGODB_DB);
+        await database.collection("favorites").createIndex({ userId: 1, creatorName: 1 }, { unique: true });
+    }
 
     app.listen(port, "127.0.0.1", () => {
+        if (adminDashboardOnly) {
+            console.log(`NITI AI admin dashboard is available at http://localhost:${port}/admin`);
+            console.log("Admin-only mode reads Firestore and disables the MongoDB-backed app APIs.");
+            return;
+        }
         console.log(`NITI AI is available at http://localhost:${port}`);
         console.log(`Connected to MongoDB database "${process.env.MONGODB_DB}".`);
     });
@@ -327,6 +493,6 @@ async function start() {
 
 start().catch(async error => {
     console.error("Could not start NITI AI backend:", error);
-    await mongoClient.close().catch(() => {});
+    if (mongoClient) await mongoClient.close().catch(() => {});
     process.exitCode = 1;
 });

@@ -13,6 +13,18 @@ Use Node.js 22 or newer.
 
 The website keeps Firebase Authentication for account sign-in. MongoDB stores the app's project data; connecting Compass alone does not transfer existing Firestore data.
 
+## Secure admin dashboard
+
+The static Firebase Hosting site (`public/`) saves contact requests and project briefs to Firestore. The full Express app at the repository root saves the same data types to MongoDB. The Express admin dashboard reads both stores, and looks up account email/display name through Firebase Authentication. A record contains a Firebase UID; contact requests do not independently store customer email.
+
+1. Sign in to NITI AI with the account that should be an administrator, then find its Firebase user UID in **Firebase Console → Authentication → Users**.
+2. Add that UID to the private `.env` file as `ADMIN_UIDS=your-firebase-user-uid`. Multiple administrator UIDs can be comma-separated. The server checks this list after verifying the Firebase ID token; being signed in alone does not grant access. Do not configure an email address in place of a UID.
+3. Ensure the service account configured by `GOOGLE_APPLICATION_CREDENTIALS` can read Firestore and look up Firebase Authentication users. Keep its JSON key and `.env` private.
+4. For the Firebase Hosting data, set `ADMIN_DASHBOARD_ONLY=true` in `.env`, then start with `npm.cmd start`. In this mode MongoDB is not required, the app redirects `/` to `/admin`, and non-admin API routes are disabled. Set the value back to `false` to run the normal MongoDB-backed app. The dashboard displays records from Firestore and MongoDB when the normal app mode is used.
+5. Open `http://localhost:5500/admin` and sign in with the configured administrator account (email/password or Google, as enabled for that account). Use **Refresh** to reload records.
+
+The dashboard reports loading, empty, and error states and shows up to the latest 200 records per collection from each store. Firebase users can read only their own Firestore records under the existing Firestore rules; this dashboard's administrator-only API is enforced server-side. The admin page is served by the Express app, not Firebase Hosting. No database rules are changed by this feature. Do not deploy the app or change live rules without reviewing and explicitly approving those steps.
+
 ## Creator catalog local development
 
 The frontend is plain HTML/CSS/browser JavaScript. A small Node HTTP server can run its CSV-backed UI without MongoDB or Firebase credentials:
