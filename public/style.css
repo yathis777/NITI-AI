@@ -1049,3 +1049,25 @@ button {
     background: rgba(0, 217, 255, 0.12);
     transform: translateY(-1px);
 }
+
+
+/* NITI AI Q&A chat */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.niti-chat-launcher{position:fixed;right:24px;bottom:24px;z-index:1000;display:flex;align-items:center;gap:10px;padding:14px 20px;border:0;border-radius:999px;background:linear-gradient(135deg,#00d9ff,#7c5cff);color:#06121f;font-weight:800;font-size:15px;box-shadow:0 12px 35px #00d9ff45;cursor:pointer;transition:transform .2s,box-shadow .2s}
+.niti-chat-launcher:hover{transform:translateY(-3px);box-shadow:0 16px 42px #00d9ff66}
+.niti-chat{position:fixed;right:24px;bottom:92px;z-index:1001;display:none;flex-direction:column;width:min(390px,calc(100vw - 28px));height:min(570px,calc(100dvh - 120px));overflow:hidden;border:1px solid #253a52;border-radius:22px;background:#0d1726;color:#eaf5ff;box-shadow:0 24px 80px #0009}
+.niti-chat.open{display:flex;animation:niti-chat-in .2s ease-out}
+@keyframes niti-chat-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.niti-chat-header{display:flex;align-items:center;justify-content:space-between;padding:17px 18px;background:linear-gradient(110deg,#112b40,#191d3b);border-bottom:1px solid #26384d}
+.niti-chat-header>div{display:flex;align-items:center;gap:11px}.niti-chat-header strong,.niti-chat-header small{display:block}.niti-chat-header strong{font-size:15px}.niti-chat-header small{margin-top:3px;color:#9eb3c8;font-size:12px}
+.niti-chat-avatar{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#00d9ff1c;color:#00d9ff;font-size:23px}
+.niti-chat-close{border:0;background:none;color:#a9bed3;font-size:28px;cursor:pointer}.niti-chat-close:hover{color:white}
+.niti-chat-messages{display:flex;flex:1;flex-direction:column;gap:12px;padding:18px 15px;overflow-y:auto;scroll-behavior:smooth}
+.niti-chat-message{max-width:88%;padding:11px 13px;border-radius:15px;font-size:14px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.niti-chat-message.assistant{align-self:flex-start;border:1px solid #26384d;background:#152337;color:#e5f0fa;border-bottom-left-radius:5px}
+.niti-chat-message.user{align-self:flex-end;background:#00c9ee;color:#06121f;border-bottom-right-radius:5px}
+.niti-chat-message.pending{color:#9eb3c8;font-style:italic}
+.niti-chat-suggestions{display:flex;gap:8px;padding:0 14px 12px;overflow-x:auto}.niti-chat-suggestions button{flex:0 0 auto;padding:8px 10px;border:1px solid #2b4760;border-radius:999px;background:#122339;color:#aeeeff;font-size:12px;cursor:pointer}.niti-chat-suggestions button:hover{border-color:#00d9ff}
+.niti-chat-form{display:flex;gap:9px;padding:12px 14px;border-top:1px solid #26384d}.niti-chat-form input{min-width:0;flex:1;padding:12px 14px;border:1px solid #2a3d53;border-radius:999px;outline:none;background:#101e30;color:#f4f9ff;font:inherit;font-size:14px}.niti-chat-form input:focus{border-color:#00d9ff}.niti-chat-form input::placeholder{color:#8299af}.niti-chat-form button{width:44px;height:44px;border:0;border-radius:50%;background:#00d9ff;color:#06121f;font-size:19px;cursor:pointer}.niti-chat-form button:disabled{opacity:.55;cursor:wait}
+.niti-chat-note{margin:0;padding:0 14px 12px;color:#7f94a9;font-size:11px;text-align:center}
+@media(max-width:480px){.niti-chat-launcher{right:14px;bottom:14px;padding:13px 16px}.niti-chat{right:10px;bottom:78px;height:min(570px,calc(100dvh - 95px))}}
