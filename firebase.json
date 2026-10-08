@@ -23,7 +23,43 @@
             "key": "Cache-Control"
           }
         ],
+        "source": "**/*.html"
+      },
+      {
+        "headers": [
+          {
+            "value": "no-cache, no-store, must-revalidate",
+            "key": "Cache-Control"
+          }
+        ],
+        "source": "**/script.js"
+      },
+      {
+        "headers": [
+          {
+            "value": "no-cache, no-store, must-revalidate",
+            "key": "Cache-Control"
+          }
+        ],
+        "source": "**/style.css"
+      },
+      {
+        "headers": [
+          {
+            "value": "no-cache, no-store, must-revalidate",
+            "key": "Cache-Control"
+          }
+        ],
         "source": "**/ai-chat.js"
+      },
+      {
+        "headers": [
+          {
+            "value": "no-cache, no-store, must-revalidate",
+            "key": "Cache-Control"
+          }
+        ],
+        "source": "**/ai-config.js"
       }
     ]
   }

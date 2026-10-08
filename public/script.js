@@ -1089,30 +1089,60 @@ document.addEventListener(
 
     }
 );
+let loginReturnFocus = null;
+
+function setAuthMode(mode) {
+    authMode = mode === "signup" ? "signup" : "login";
+    const modal = document.getElementById("loginModal");
+    const heading = document.getElementById("authTitle");
+    const subtitle = document.getElementById("authSubtitle");
+    const submit = document.getElementById("loginSubmit");
+    const password = document.getElementById("password");
+    const passwordHint = document.getElementById("authPasswordHint");
+    const forgot = document.getElementById("forgotPasswordButton");
+    const loginTab = document.getElementById("authLoginTab");
+    const joinTab = document.getElementById("authJoinTab");
+    const message = document.getElementById("loginMessage");
+    const isSignup = authMode === "signup";
+    if (heading) heading.textContent = isSignup ? "Create your account" : "Welcome back";
+    if (subtitle) subtitle.textContent = isSignup ? "Join NITI AI and bring your next idea to life." : "Sign in to pick up where your creativity left off.";
+    if (submit) submit.querySelector("span").textContent = isSignup ? "Create account" : "Log in";
+    if (password) password.autocomplete = isSignup ? "new-password" : "current-password";
+    if (passwordHint) passwordHint.hidden = !isSignup;
+    if (forgot) forgot.hidden = isSignup;
+    if (loginTab) {
+        loginTab.classList.toggle("active", !isSignup);
+        loginTab.setAttribute("aria-selected", String(!isSignup));
+    }
+    if (joinTab) {
+        joinTab.classList.toggle("active", isSignup);
+        joinTab.setAttribute("aria-selected", String(isSignup));
+    }
+    if (message) message.textContent = "";
+    if (modal) modal.dataset.mode = authMode;
+}
+
 function openLogin() {
     const modal = document.getElementById("loginModal");
     if (!modal) return;
 
-    authMode = "login";
-    const heading = document.querySelector(".login-box h2");
-    const subtitle = document.querySelector(".login-box > p");
-    const submit = document.getElementById("loginSubmit");
-    const toggle = document.getElementById("authModeToggle");
-    const message = document.getElementById("loginMessage");
-    if (heading) heading.textContent = "Welcome to NITI AI";
-    if (subtitle) subtitle.textContent = "Login to connect with AI creators";
-    if (submit) submit.textContent = "Login";
-    if (toggle) toggle.textContent = "New here? Create an account";
-    if (message) message.textContent = "";
-
+    loginReturnFocus = document.activeElement;
+    setAuthMode("login");
     modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("auth-open");
+
     const email = document.getElementById("email");
     if (email) setTimeout(() => email.focus(), 100);
 }
 
 function closeLogin() {
     const modal = document.getElementById("loginModal");
-    if (modal) modal.classList.remove("show");
+    if (!modal || !modal.classList.contains("show")) return;
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("auth-open");
+    if (loginReturnFocus && typeof loginReturnFocus.focus === "function") loginReturnFocus.focus();
 }
 // Firebase-backed account, favorites, creator requests, and project briefs.
 let authMode = "login";
@@ -1121,16 +1151,7 @@ let briefCreatorName = "";
 
 function toggleAuthMode() {
     authMode = authMode === "login" ? "signup" : "login";
-    const heading = document.querySelector(".login-box h2");
-    const subtitle = document.querySelector(".login-box > p");
-    const submit = document.getElementById("loginSubmit");
-    const toggle = document.getElementById("authModeToggle");
-    const message = document.getElementById("loginMessage");
-    if (heading) heading.textContent = authMode === "signup" ? "Create your NITI AI account" : "Welcome to NITI AI";
-    if (subtitle) subtitle.textContent = authMode === "signup" ? "Sign up to connect with AI creators" : "Login to connect with AI creators";
-    if (submit) submit.textContent = authMode === "signup" ? "Create account" : "Login";
-    if (toggle) toggle.textContent = authMode === "signup" ? "Already have an account? Login" : "New here? Create an account";
-    if (message) message.textContent = "";
+    setAuthMode(authMode);
 }
 
 function syncAuthUI(user) {
@@ -1175,58 +1196,125 @@ function authErrorMessage(error) {
         "auth/network-request-failed": "Network error. Check your internet connection and retry.",
         "auth/operation-not-allowed": "Email and password sign-in is not enabled in Firebase.",
         "auth/unauthorized-domain": "localhost is not allowed in Firebase Authentication settings.",
+        "auth/popup-closed-by-user": "The Google sign-in window was closed before finishing.",
+        "auth/popup-blocked": "Your browser blocked the Google sign-in window. Allow pop-ups and try again.",
+        "auth/cancelled-popup-request": "Another sign-in window is already open.",
+        "auth/account-exists-with-different-credential": "An account already exists with this email. Sign in using its original method.",
+        "auth/requires-recent-login": "Please sign in again before continuing.",
         "auth/api-key-not-valid.-please-pass-a-valid-api-key.": "Firebase API key is not valid; check firebase-config.js."
     };
     return messages[error.code] || ("Firebase error: " + (error.code || error.message || "unknown"));
 }
 
-async function login() {
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
+function setAuthMessage(text, kind) {
     const message = document.getElementById("loginMessage");
-    const submit = document.getElementById("loginSubmit");
-    if (!emailInput || !passwordInput || !message) return;
+    if (!message) return;
+    message.textContent = text;
+    message.dataset.kind = kind || "info";
+}
 
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
-    if (!email || !password) {
-        message.textContent = "Please enter your email and password.";
-        message.style.color = "#ff6b6b";
+async function googleSignIn() {
+    if (!window.nitiAuth || !window.firebase) {
+        setAuthMessage("Authentication is unavailable. Check your connection and retry.", "error");
+        return;
+    }
+    const button = document.getElementById("googleSignInButton");
+    if (button) button.disabled = true;
+    setAuthMessage("Opening secure Google sign-in…", "info");
+    try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await window.nitiAuth.signInWithPopup(provider);
+        closeLogin();
+        showNotification("Welcome to NITI AI", "You are signed in with Google.");
+    } catch (error) {
+        setAuthMessage(authErrorMessage(error), "error");
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+async function forgotPassword() {
+    const emailInput = document.getElementById("email");
+    const email = emailInput ? emailInput.value.trim() : "";
+    if (!email) {
+        setAuthMessage("Enter your email address first and we’ll send a reset link.", "error");
+        if (emailInput) emailInput.focus();
+        return;
+    }
+    if (!emailInput.validity.valid) {
+        setAuthMessage("Please enter a valid email address.", "error");
+        emailInput.focus();
         return;
     }
     if (!window.nitiAuth) {
-        message.textContent = "Firebase did not load. Open this site through a local web server and retry.";
-        message.style.color = "#ff6b6b";
+        setAuthMessage("Authentication is unavailable. Check your connection and retry.", "error");
+        return;
+    }
+    const button = document.getElementById("forgotPasswordButton");
+    if (button) button.disabled = true;
+    setAuthMessage("Sending password reset email…", "info");
+    try {
+        await window.nitiAuth.sendPasswordResetEmail(email);
+        setAuthMessage("If an account exists for that email, a password reset link is on its way.", "success");
+    } catch (error) {
+        setAuthMessage(authErrorMessage(error), "error");
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+async function login(event) {
+    if (event) event.preventDefault();
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const submit = document.getElementById("loginSubmit");
+    if (!emailInput || !passwordInput) return;
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email || !emailInput.validity.valid) {
+        setAuthMessage("Please enter a valid email address.", "error");
+        emailInput.focus();
+        return;
+    }
+    if (!password) {
+        setAuthMessage("Please enter your password.", "error");
+        passwordInput.focus();
         return;
     }
     if (authMode === "signup" && password.length < 6) {
-        message.textContent = "Use a password with at least 6 characters.";
-        message.style.color = "#ff6b6b";
+        setAuthMessage("Use a password with at least 6 characters.", "error");
+        passwordInput.focus();
+        return;
+    }
+    if (!window.nitiAuth) {
+        setAuthMessage("Authentication is unavailable. Check your connection and retry.", "error");
         return;
     }
 
     if (submit) submit.disabled = true;
-    message.textContent = authMode === "signup" ? "Creating your account..." : "Signing in...";
-    message.style.color = "#94a3b8";
+    setAuthMessage(authMode === "signup" ? "Creating your account…" : "Signing you in…", "info");
     try {
         if (authMode === "signup") {
             await window.nitiAuth.createUserWithEmailAndPassword(email, password);
         } else {
             await window.nitiAuth.signInWithEmailAndPassword(email, password);
         }
-        message.textContent = authMode === "signup" ? "Account created successfully!" : "Login successful!";
-        message.style.color = "#00e676";
+        setAuthMessage(authMode === "signup" ? "Account created successfully!" : "You’re signed in!", "success");
         setTimeout(() => {
             closeLogin();
             showNotification("Welcome to NITI AI", "You are signed in.");
         }, 700);
     } catch (error) {
-        message.textContent = authErrorMessage(error);
-        message.style.color = "#ff6b6b";
+        setAuthMessage(authErrorMessage(error), "error");
     } finally {
         if (submit) submit.disabled = false;
     }
 }
+
+document.getElementById("loginModal")?.addEventListener("click", event => {
+    if (event.target.id === "loginModal") closeLogin();
+});
 
 async function logout() {
     try {

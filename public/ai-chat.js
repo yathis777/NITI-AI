@@ -1,6 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getAI, getGenerativeModel, GoogleAIBackend, ThinkingLevel } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-ai.js";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check.js";
+import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDg3bgUlfIzxBPCjUM5PVTkaO-jaXmUhDI",
@@ -17,20 +16,10 @@ const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostna
 if (isLocalhost) {
     self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 }
-if (appCheckSiteKey) {
-    initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
-}
-const ai = getAI(app, { backend: new GoogleAIBackend() });
-const model = getGenerativeModel(ai, {
-    model: "gemini-3.8-flash",
-    generationConfig: {
-        temperature: 0.35,
-        maxOutputTokens: 350,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-    },
-    systemInstruction: `You are the helpful NITI AI assistant. Answer in the same language as the user, including natural Telugu when appropriate. Help with creator discovery, project briefs, and writing creative prompts. Do not invent creator profiles, prices, reviews, verification, or match scores; this chat does not receive the live creator catalog, so direct users to the creator filters for current profile details. This chat returns text only and cannot generate or display images or videos. For image or video requests, clearly label any text prompt as "Prompt draft - not generated media"; use editable placeholders or ask a short clarifying question for missing details. Never say media was generated. Do not claim to have booked or contacted anyone, read private account information, or saved a brief. If unsure, say so. Never ask the user to share passwords, API keys, or private information.`
+const appCheck = initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true
 });
-
 const panel = document.getElementById("nitiChat");
 const launcher = document.getElementById("nitiChatLauncher");
 const closeButton = document.getElementById("nitiChatClose");
@@ -41,12 +30,32 @@ const messages = document.getElementById("nitiChatMessages");
 const suggestions = document.getElementById("nitiChatSuggestions");
 const suggestionsToggle = document.getElementById("nitiChatSuggestionsToggle");
 const suggestionMenu = document.getElementById("nitiChatSuggestionMenu");
+const chatTab = document.getElementById("nitiChatTab");
+const imageTab = document.getElementById("nitiImageTab");
+const chatView = document.getElementById("nitiChatView");
+const imageView = document.getElementById("nitiImageView");
+const imageForm = document.getElementById("nitiImageForm");
+const imagePrompt = document.getElementById("nitiImagePrompt");
+const imageStyle = document.getElementById("nitiImageStyle");
+const imageRatio = document.getElementById("nitiImageRatio");
+const imageGenerate = document.getElementById("nitiImageGenerate");
+const imageStatus = document.getElementById("nitiImageStatus");
+const imageResult = document.getElementById("nitiImageResult");
+const imagePromptCount = document.getElementById("nitiImagePromptCount");
 
 suggestions.querySelectorAll("[data-question]").forEach(button => {
     const menuButton = document.createElement("button");
     menuButton.type = "button";
     menuButton.role = "menuitem";
     menuButton.dataset.question = button.dataset.question;
+    menuButton.textContent = button.textContent;
+    suggestionMenu.appendChild(menuButton);
+});
+suggestions.querySelectorAll("[data-action]").forEach(button => {
+    const menuButton = document.createElement("button");
+    menuButton.type = "button";
+    menuButton.role = "menuitem";
+    menuButton.dataset.action = button.dataset.action;
     menuButton.textContent = button.textContent;
     suggestionMenu.appendChild(menuButton);
 });
@@ -69,11 +78,28 @@ function closeSuggestionMenu() {
     suggestionsToggle.setAttribute("aria-expanded", "false");
 }
 function selectSuggestion(event) {
-    const button = event.target.closest("[data-question]");
+    const button = event.target.closest("[data-question], [data-action]");
     if (!button) return;
+    if (button.dataset.action === "image") {
+        setChatMode("image");
+        closeSuggestionMenu();
+        imagePrompt.focus();
+        return;
+    }
     input.value = button.dataset.question;
     closeSuggestionMenu();
     input.focus();
+}
+
+function setChatMode(mode) {
+    const showImage = mode === "image";
+    chatView.hidden = showImage;
+    imageView.hidden = !showImage;
+    chatTab.classList.toggle("active", !showImage);
+    imageTab.classList.toggle("active", showImage);
+    chatTab.setAttribute("aria-selected", String(!showImage));
+    imageTab.setAttribute("aria-selected", String(showImage));
+    if (showImage) imagePrompt.focus();
 }
 function addMessage(text, role, extraClass = "") {
     const message = document.createElement("div");
@@ -127,8 +153,121 @@ async function getInstantReply(question, language) {
     return null;
 }
 
+async function getAiAnswer(prompt) {
+    const workerUrl = getWorkerUrl();
+    const { token } = await getToken(appCheck, false);
+    const response = await fetch(`${workerUrl}/api/chat`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Firebase-AppCheck": token
+        },
+        body: JSON.stringify({ messages: [{ role: "user", content: prompt }] })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+        const error = new Error(result.error || `AI request failed with HTTP ${response.status}.`);
+        error.code = result.code || "ai_request_failed";
+        throw error;
+    }
+    if (typeof result.answer !== "string" || !result.answer.trim()) {
+        throw new Error("The AI backend returned an empty answer.");
+    }
+    return result.answer.trim();
+}
+
+function getWorkerUrl() {
+    const workerUrl = window.NITI_AI_CHAT_WORKER_URL;
+    if (typeof workerUrl !== "string" || !/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)?\.workers\.dev$/i.test(workerUrl)) {
+        throw new Error("The free AI backend is not deployed or its Worker URL is not configured yet.");
+    }
+    return workerUrl;
+}
+
+function addGeneratedImage(blob, prompt) {
+    const previousImage = imageResult.querySelector("img");
+    if (previousImage?.src.startsWith("blob:")) URL.revokeObjectURL(previousImage.src);
+    const message = document.createElement("div");
+    message.className = "niti-image-output";
+    const image = document.createElement("img");
+    image.src = URL.createObjectURL(blob);
+    image.alt = `AI-generated image: ${prompt.slice(0, 180)}`;
+    const footer = document.createElement("div");
+    footer.className = "niti-image-output-footer";
+    const label = document.createElement("span");
+    label.textContent = "Your generated image";
+    const download = document.createElement("a");
+    download.href = image.src;
+    download.download = "niti-ai-generated-image.jpg";
+    download.textContent = "Download image";
+    footer.append(label, download);
+    message.append(image, footer);
+    imageResult.replaceChildren(message);
+    imageResult.hidden = false;
+}
+
 launcher.addEventListener("click", () => panel.classList.contains("open") ? closeChat() : openChat());
 closeButton.addEventListener("click", closeChat);
+chatTab.addEventListener("click", () => setChatMode("chat"));
+imageTab.addEventListener("click", () => setChatMode("image"));
+imagePrompt.addEventListener("input", () => {
+    imagePromptCount.textContent = String(imagePrompt.value.length);
+});
+imageForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const description = imagePrompt.value.trim();
+    if (!description || imageGenerate.disabled) return;
+    const prompt = [
+        description,
+        `Visual style: ${imageStyle.value}.`,
+        `Composition: ${imageRatio.value}.`,
+        "Create a clean, high-quality image. Do not include words or lettering unless requested."
+    ].join("\n");
+    if (prompt.length > 2048) {
+        imageStatus.textContent = "Shorten the description a little so it fits the selected style and composition.";
+        imageStatus.dataset.kind = "error";
+        return;
+    }
+    imageGenerate.disabled = true;
+    imageResult.hidden = true;
+    imageStatus.textContent = "Creating your image… this may take a little while.";
+    imageStatus.dataset.kind = "info";
+    try {
+        const { token } = await getToken(appCheck, false);
+        const response = await fetch(`${getWorkerUrl()}/api/image`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Firebase-AppCheck": token
+            },
+            body: JSON.stringify({ prompt })
+        });
+        if (!response.ok) {
+            const result = await response.json();
+            const error = new Error(result.error || `Image generation failed with HTTP ${response.status}.`);
+            error.code = result.code || "image_generation_failed";
+            throw error;
+        }
+        if (!response.headers.get("Content-Type")?.startsWith("image/")) {
+            throw new Error("The image service returned an unsupported response.");
+        }
+        const blob = await response.blob();
+        if (!blob.size) throw new Error("The image service returned an empty image.");
+        addGeneratedImage(blob, description);
+        imageStatus.textContent = "Your image is ready.";
+        imageStatus.dataset.kind = "success";
+    } catch (error) {
+        console.error("NITI AI image generation error:", error);
+        imageStatus.textContent = error.code === "daily_quota_exceeded"
+            ? "The free AI daily limit has been reached. Please try again after it resets."
+            : error.code === "app_check_rejected"
+                ? "Firebase App Check rejected this request. Refresh the page and try again."
+                : String(error.message || "Image generation failed. Please try again.");
+        imageStatus.dataset.kind = "error";
+    } finally {
+        imageGenerate.disabled = false;
+    }
+});
 suggestions.addEventListener("click", selectSuggestion);
 suggestionMenu.addEventListener("click", selectSuggestion);
 suggestionsToggle.addEventListener("click", () => {
@@ -164,37 +303,25 @@ form.addEventListener("submit", async event => {
             ? `The user is asking about image/video creation. You can only return text, not media. Start with "Prompt draft — not generated media". If the user has not provided enough details, write a concise editable prompt template with clear placeholders and ask what to fill in. Never say you generated an image or video.`
             : `You can only return text, not generated images or videos. If asked to create media, offer a clearly labeled prompt draft and never say you generated it.`;
         const prompt = `For this reply, answer only in ${replyLanguage}. Do not switch languages. ${mediaInstruction} User question: ${question}`;
-        const result = await model.generateContentStream(prompt);
-        let answer = "";
-        for await (const chunk of result.stream) {
-            const text = chunk.text();
-            if (!text) continue;
-            answer += text;
-            pending.textContent = answer;
-            pending.classList.remove("pending");
-            messages.scrollTop = messages.scrollHeight;
-        }
-        if (!answer) {
-            const response = await result.response;
-            answer = response.text();
-        }
+        const answer = await getAiAnswer(prompt);
         pending.textContent = answer || (replyLanguage === "Telugu" ? "క్షమించండి, ఇప్పుడే సమాధానం రాలేదు. మళ్లీ ప్రయత్నించండి." : "Sorry, I couldn't generate an answer just now. Please try again.");
         pending.classList.remove("pending");
     } catch (error) {
         console.error("NITI AI chat error:", error);
         const code = String(error?.code || error?.status || error?.name || "unknown");
-        const errorMessage = String(error?.message || "");
-        const detail = errorMessage.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]").replace(/\s+/g, " ").slice(0, 280);
-        const reason = detail ? `${code}: ${detail}` : code;
-        const appCheckRejected = /app.?check.*(?:token.*invalid|invalid.*token)|token is invalid/i.test(errorMessage);
-        if (appCheckRejected) {
+        if (code === "daily_quota_exceeded") {
             pending.textContent = replyLanguage === "Telugu"
-                ? "Firebase App Check ఈ అభ్యర్థనను తిరస్కరించింది. Localhostలో browser consoleలో కనిపించే debug token‌ను Firebase Console → Security → App Check → Appsలో ఈ web appకు register చేసి మళ్లీ ప్రయత్నించండి. Live siteలో App Check provider, site key, domain సరిగ్గా సరిపోతున్నాయో చూడండి."
-                : "Firebase App Check rejected this request. On localhost, register the debug token shown in the browser console under Firebase Console → Security → App Check → Apps for this web app, then retry. On the live site, verify the App Check provider, site key, and allowed domain.";
+                ? "ఈరోజు ఉచిత AI వినియోగ పరిమితి ముగిసింది. పరిమితి మళ్లీ ప్రారంభమైన తర్వాత ప్రయత్నించండి."
+                : "The free AI daily limit has been reached. Please try again after it resets.";
+        } else if (code === "app_check_rejected") {
+            pending.textContent = replyLanguage === "Telugu"
+                ? "Firebase App Check ఈ అభ్యర్థనను తిరస్కరించింది. Localhost debug token లేదా live site App Check సెట్టింగ్‌లను తనిఖీ చేయండి."
+                : "Firebase App Check rejected this request. Check the localhost debug token or the live site's App Check settings.";
         } else {
+            const detail = String(error?.message || code).replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]").replace(/\s+/g, " ").slice(0, 280);
             pending.textContent = replyLanguage === "Telugu"
-                ? `AI అభ్యర్థన విఫలమైంది. కారణం: ${reason}`
-                : `The AI request failed. Details: ${reason}`;
+                ? `AI అభ్యర్థన విఫలమైంది. కారణం: ${detail}`
+                : `The AI request failed. Details: ${detail}`;
         }
         pending.classList.remove("pending");
     } finally {

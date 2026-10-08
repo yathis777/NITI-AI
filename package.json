@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "prepare:hosting-data": "node scripts/sync-creator-data.js"
+    "prepare:hosting-data": "node scripts/sync-creator-data.js",
+    "test:cloudflare-ai": "node --test cloudflare/src/index.test.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

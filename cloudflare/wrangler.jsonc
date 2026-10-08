@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "niti-ai-chat",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "FIREBASE_PROJECT_NUMBER": "620811813898",
+    "FIREBASE_APP_ID": "1:620811813898:web:2defe24fefa8796e97cbf3",
+    "ALLOWED_ORIGINS": "https://niti-ai-2ba5d.web.app,https://niti-ai-2ba5d.firebaseapp.com",
+    "AI_MODEL": "@cf/meta/llama-3.2-3b-instruct",
+    "IMAGE_MODEL": "@cf/black-forest-labs/flux-1-schnell"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
