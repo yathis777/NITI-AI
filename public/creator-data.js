@@ -1,6 +1,6 @@
 (() => {
     const requiredColumns = [
-        "id", "name", "location", "category", "skills", "rating", "reviewCount",
+        "id", "name", "location", "category", "skills", "specializations", "tools", "rating", "reviewCount",
         "totalRevenue", "monthlyRevenue", "reelPrice", "promotionPrice", "storyPrice",
         "totalProjects", "completedProjects", "activeProjects", "socialLinks", "portfolio", "reviews"
     ];
@@ -82,42 +82,53 @@
         return value;
     }
 
-    function stringArray(value, column, rowNumber) {
-        if (!Array.isArray(value) || value.length === 0 || value.some(item => typeof item !== "string" || !item.trim())) {
-            throw new Error(`CSV row ${rowNumber}: "${column}" must be a non-empty JSON array of strings.`);
+    function optionalInteger(row, column, rowNumber) {
+        return row[column].trim() ? integer(row, column, rowNumber) : null;
+    }
+
+    function stringArray(value, column, rowNumber, allowEmpty = false) {
+        if (!Array.isArray(value) || (!allowEmpty && value.length === 0) || value.some(item => typeof item !== "string" || !item.trim())) {
+            throw new Error(`CSV row ${rowNumber}: "${column}" must be a${allowEmpty ? "n" : " non-empty"} JSON array of strings.`);
         }
-        return value.map(item => item.trim());
+        const values = value.map(item => item.trim());
+        if (new Set(values).size !== values.length) {
+            throw new Error(`CSV row ${rowNumber}: "${column}" must not contain duplicate values.`);
+        }
+        return values;
     }
 
     function mapCreator(row, rowNumber) {
         const id = requiredText(row, "id", rowNumber);
         const name = requiredText(row, "name", rowNumber);
-        const location = requiredText(row, "location", rowNumber);
-        const category = requiredText(row, "category", rowNumber);
+        const location = row.location.trim();
+        const category = row.category.trim();
         const skills = stringArray(parseJSONCell(row, "skills", rowNumber), "skills", rowNumber);
+        const specializations = stringArray(parseJSONCell(row, "specializations", rowNumber), "specializations", rowNumber, true);
+        const tools = stringArray(parseJSONCell(row, "tools", rowNumber), "tools", rowNumber, true);
         const socialLinks = parseJSONCell(row, "socialLinks", rowNumber);
         const portfolio = parseJSONCell(row, "portfolio", rowNumber);
         const reviews = parseJSONCell(row, "reviews", rowNumber);
-        const rating = Number(row.rating);
-        const reviewCount = integer(row, "reviewCount", rowNumber);
-        const totalProjects = integer(row, "totalProjects", rowNumber);
-        const completedProjects = integer(row, "completedProjects", rowNumber);
-        const activeProjects = integer(row, "activeProjects", rowNumber);
+        const rating = row.rating.trim() ? Number(row.rating) : null;
+        const reviewCount = optionalInteger(row, "reviewCount", rowNumber);
+        const totalProjects = optionalInteger(row, "totalProjects", rowNumber);
+        const completedProjects = optionalInteger(row, "completedProjects", rowNumber);
+        const activeProjects = optionalInteger(row, "activeProjects", rowNumber);
 
-        if (!Number.isFinite(rating) || rating < 0 || rating > 5) {
+        if (rating !== null && (!Number.isFinite(rating) || rating < 0 || rating > 5)) {
             throw new Error(`CSV row ${rowNumber}: "rating" must be a number from 0 to 5.`);
         }
-        if (totalProjects !== completedProjects + activeProjects) {
+        if (totalProjects !== null && completedProjects !== null && activeProjects !== null &&
+            totalProjects !== completedProjects + activeProjects) {
             throw new Error(`CSV row ${rowNumber}: totalProjects must equal completedProjects + activeProjects.`);
         }
-        if (reviewCount < 1) throw new Error(`CSV row ${rowNumber}: "reviewCount" must be at least 1.`);
+        if (reviewCount !== null && reviewCount < 1) throw new Error(`CSV row ${rowNumber}: "reviewCount" must be at least 1.`);
 
         const money = {
-            total: integer(row, "totalRevenue", rowNumber),
-            monthly: integer(row, "monthlyRevenue", rowNumber),
-            reel: integer(row, "reelPrice", rowNumber),
-            promotion: integer(row, "promotionPrice", rowNumber),
-            story: integer(row, "storyPrice", rowNumber)
+            total: optionalInteger(row, "totalRevenue", rowNumber),
+            monthly: optionalInteger(row, "monthlyRevenue", rowNumber),
+            reel: optionalInteger(row, "reelPrice", rowNumber),
+            promotion: optionalInteger(row, "promotionPrice", rowNumber),
+            story: optionalInteger(row, "storyPrice", rowNumber)
         };
 
         if (!Array.isArray(socialLinks) || socialLinks.some(link =>
@@ -126,8 +137,8 @@
         )) {
             throw new Error(`CSV row ${rowNumber}: "socialLinks" must be a JSON array of HTTPS links.`);
         }
-        if (!Array.isArray(portfolio) || portfolio.length === 0) {
-            throw new Error(`CSV row ${rowNumber}: "portfolio" must be a non-empty JSON array.`);
+        if (!Array.isArray(portfolio)) {
+            throw new Error(`CSV row ${rowNumber}: "portfolio" must be a JSON array.`);
         }
         if (portfolio.some(item =>
             !item || typeof item.title !== "string" || typeof item.client !== "string" ||
@@ -140,7 +151,7 @@
         )) {
             throw new Error(`CSV row ${rowNumber}: "portfolio" contains an invalid mock project.`);
         }
-        if (!Array.isArray(reviews) || reviews.length < 2 || reviews.length > 3 ||
+        if (!Array.isArray(reviews) || (reviews.length > 0 && (reviews.length < 2 || reviews.length > 3)) ||
             reviews.some(review => !review || typeof review.author !== "string" ||
                 typeof review.text !== "string" || !review.text.trim() ||
                 !Number.isInteger(review.rating) || review.rating < 1 || review.rating > 5)
@@ -153,23 +164,23 @@
             mediaUrl: item.thumbnail || "",
             toolsUsed: [...item.toolsUsed]
         }));
-        const aiTools = [...new Set(portfolioItems.flatMap(item => item.toolsUsed))];
 
         return {
             id,
             name,
             location,
             category,
-            role: `${category} Creator`,
-            specialization: `${category} · ${skills.slice(0, 2).join(", ")}`,
-            bio: `Mock creator profile based in ${location}, specializing in ${skills.slice(0, 3).join(", ")} for sample brand campaigns.`,
+            role: category ? `${category} Creator` : "",
+            specialization: specializations.length ? specializations.join(", ") : category ? `${category} · ${skills.slice(0, 2).join(", ")}` : "",
+            specializations,
+            bio: category || location ? `Mock creator profile based in ${location || "an unspecified location"}, specializing in ${skills.slice(0, 3).join(", ")} for sample brand campaigns.` : "",
             skills,
+            tools,
             rating,
             reviewCount,
             revenue: {
                 total: money.total,
-                thisMonth: money.monthly,
-                completedCampaigns: money.total
+                thisMonth: money.monthly
             },
             pricing: {
                 reel: money.reel,
@@ -184,11 +195,10 @@
             socialLinks,
             portfolioItems,
             reviews,
-            aiTools,
-            workflowSteps: ["Mock brief and creative direction", "Sample concept and production", "Review and delivery"],
+            workflowSteps: portfolioItems.length ? ["Mock brief and creative direction", "Sample concept and production", "Review and delivery"] : [],
             contentTypes: [...new Set(portfolioItems.map(item => item.format))],
             verification: { tools: false, workflow: false, pastWork: false },
-            match: Math.round(rating * 20)
+            match: rating === null ? null : Math.round(rating * 20)
         };
     }
 

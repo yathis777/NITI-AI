@@ -10,11 +10,16 @@
 let creators = [];
 
 function formatCreatorCurrency(amount) {
+    if (!Number.isFinite(amount)) return "Not provided";
     return new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
         maximumFractionDigits: 0
     }).format(amount);
+}
+
+function displayOptionalValue(value) {
+    return value === null || value === undefined || value === "" ? "Not provided" : escapeHTML(value);
 }
 
 function renderCreatorSocialLinks(links) {
@@ -34,9 +39,10 @@ function getCreatorSearchText(creator) {
         creator.role,
         creator.location,
         creator.specialization,
+        ...creator.specializations,
         creator.bio,
         ...creator.skills,
-        ...creator.aiTools,
+        ...creator.tools,
         ...creator.contentTypes,
         ...creator.socialLinks.flatMap(link => [link.platform, link.handle]),
         ...creator.portfolioItems.flatMap(item => [item.title, item.client, item.status, item.description, item.format, ...item.toolsUsed]),
@@ -128,24 +134,44 @@ function normalizeSearchText(value) {
 
 function getSelectedCreatorFilters() {
     return {
-        skill: document.getElementById("creatorSkillFilter")?.value || "",
+        skills: [...document.querySelectorAll("#creatorSkillFilter input:checked")].map(input => input.value),
         category: document.getElementById("creatorCategoryFilter")?.value || "",
+        specialization: document.getElementById("creatorSpecializationFilter")?.value || "",
+        tools: [...document.querySelectorAll("#creatorToolFilter input:checked")].map(input => input.value),
         location: document.getElementById("creatorLocationFilter")?.value || "",
         rating: Number(document.getElementById("creatorRatingFilter")?.value || 0)
     };
 }
 
+function populateCreatorCheckboxFilter(id, values, name) {
+    const container = document.getElementById(id);
+    if (!container) return;
+    const options = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    container.innerHTML = options.map((value, index) => `
+        <label class="creator-filter-option" for="${name}-${index}">
+            <input id="${name}-${index}" name="${name}" type="checkbox" value="${escapeHTML(value)}" onchange="applyCreatorFilters()">
+            <span>${escapeHTML(value)}</span>
+        </label>
+    `).join("");
+}
+
 function initializeCreatorFilters() {
+    populateCreatorCheckboxFilter("creatorSkillFilter", creators.flatMap(creator => creator.skills), "creator-skill-option");
+    populateCreatorCheckboxFilter(
+        "creatorToolFilter",
+        ["Runway", "Kling AI", "Midjourney", "ElevenLabs", ...creators.flatMap(creator => creator.tools)],
+        "creator-tool-option"
+    );
     const filterOptions = [
-        {
-            id: "creatorSkillFilter",
-            values: creators.flatMap(creator => creator.skills),
-            placeholder: "All skills"
-        },
         {
             id: "creatorCategoryFilter",
             values: creators.map(creator => creator.category),
             placeholder: "All categories"
+        },
+        {
+            id: "creatorSpecializationFilter",
+            values: creators.flatMap(creator => creator.specializations),
+            placeholder: "All specializations"
         },
         {
             id: "creatorLocationFilter",
@@ -157,11 +183,10 @@ function initializeCreatorFilters() {
     filterOptions.forEach(({ id, values, placeholder }) => {
         const select = document.getElementById(id);
         if (!select) return;
-        const options = [...new Set(values)].sort((a, b) => a.localeCompare(b));
+        const options = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
         select.innerHTML = `<option value="">${placeholder}</option>` +
             options.map(value => `<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("");
     });
-
 }
 
 function applyCreatorFilters() {
@@ -170,19 +195,22 @@ function applyCreatorFilters() {
     const filters = getSelectedCreatorFilters();
     const matchingCreators = creators.filter(creator =>
         terms.every(term => normalizeSearchText(getCreatorSearchText(creator)).includes(term))
-        && (!filters.skill || creator.skills.some(value => normalizeSearchText(value) === normalizeSearchText(filters.skill)))
+        && (!filters.skills.length || filters.skills.some(filterValue => creator.skills.some(value => normalizeSearchText(value) === normalizeSearchText(filterValue))))
         && (!filters.category || normalizeSearchText(creator.category) === normalizeSearchText(filters.category))
+        && (!filters.specialization || creator.specializations.some(value => normalizeSearchText(value) === normalizeSearchText(filters.specialization)))
+        && (!filters.tools.length || filters.tools.some(filterValue => creator.tools.some(value => normalizeSearchText(value) === normalizeSearchText(filterValue))))
         && (!filters.location || normalizeSearchText(creator.location) === normalizeSearchText(filters.location))
         && (!filters.rating || creator.rating >= filters.rating)
     );
     const sortBy = document.getElementById("creatorSort")?.value || "rating";
+    const sortNumber = (value, fallback = -1) => Number.isFinite(value) ? value : fallback;
     const sorters = {
-        rating: (a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount,
-        reviews: (a, b) => b.reviewCount - a.reviewCount || b.rating - a.rating,
-        revenue: (a, b) => b.revenue.total - a.revenue.total,
-        monthly: (a, b) => b.revenue.thisMonth - a.revenue.thisMonth,
-        reel: (a, b) => a.pricing.reel - b.pricing.reel,
-        projects: (a, b) => b.projects - a.projects,
+        rating: (a, b) => sortNumber(b.rating) - sortNumber(a.rating) || sortNumber(b.reviewCount) - sortNumber(a.reviewCount),
+        reviews: (a, b) => sortNumber(b.reviewCount) - sortNumber(a.reviewCount) || sortNumber(b.rating) - sortNumber(a.rating),
+        revenue: (a, b) => sortNumber(b.revenue.total) - sortNumber(a.revenue.total),
+        monthly: (a, b) => sortNumber(b.revenue.thisMonth) - sortNumber(a.revenue.thisMonth),
+        reel: (a, b) => sortNumber(a.pricing.reel, Number.POSITIVE_INFINITY) - sortNumber(b.pricing.reel, Number.POSITIVE_INFINITY),
+        projects: (a, b) => sortNumber(b.projects) - sortNumber(a.projects),
         name: (a, b) => a.name.localeCompare(b.name)
     };
     matchingCreators.sort(sorters[sortBy] || sorters.rating);
@@ -204,7 +232,7 @@ function applyCreatorFilters() {
     });
     const visibleCount = matchingCreators.length;
 
-    const activeFilters = terms.length > 0 || filters.skill || filters.category || filters.location || filters.rating;
+    const activeFilters = terms.length > 0 || filters.skills.length > 0 || filters.category || filters.specialization || filters.tools.length > 0 || filters.location || filters.rating;
     const results = document.getElementById("creatorSearchResults");
     if (results) {
         results.textContent = activeFilters
@@ -219,7 +247,10 @@ function applyCreatorFilters() {
 function clearCreatorFilters() {
     const input = document.getElementById("creatorSearch");
     if (input) input.value = "";
-    ["creatorSkillFilter", "creatorCategoryFilter", "creatorLocationFilter", "creatorRatingFilter"]
+    document.querySelectorAll("#creatorSkillFilter input, #creatorToolFilter input").forEach(input => {
+        input.checked = false;
+    });
+    ["creatorCategoryFilter", "creatorSpecializationFilter", "creatorLocationFilter", "creatorRatingFilter"]
         .forEach(id => {
             const select = document.getElementById(id);
             if (select) select.value = "";
@@ -238,22 +269,25 @@ function renderCreatorCards() {
         card.className = "creator-card";
         card.dataset.creatorId = creator.id;
         const initials = creator.name.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
+        const roleLocation = [creator.role, creator.location].filter(Boolean).map(escapeHTML).join(" · ");
         card.innerHTML = `
             <div class="creator-avatar" aria-hidden="true">${escapeHTML(initials)}</div>
             <button class="favorite-btn" type="button" aria-label="Favorite ${escapeHTML(creator.name)}" data-creator="${escapeHTML(creator.name)}">♡</button>
             <h3>${escapeHTML(creator.name)}</h3>
-            <p class="creator-role">${escapeHTML(creator.role)} · ${escapeHTML(creator.location)}</p>
+            <p class="creator-role">${roleLocation}</p>
             <div class="creator-tags">${creator.skills.slice(0, 3).map(skill => `<span>${escapeHTML(skill)}</span>`).join("")}</div>
             <div class="creator-card-details">
-                <p class="creator-card-bio">${escapeHTML(creator.bio)}</p>
-                <p><strong>Category:</strong> ${escapeHTML(creator.category)}</p>
-                <p><strong>⭐ ${escapeHTML(creator.rating)}</strong> · ${escapeHTML(creator.reviewCount)} mock reviews</p>
-                <p><strong>Mock price:</strong> ${formatCreatorCurrency(creator.pricing.reel)} / reel</p>
+                ${creator.bio ? `<p class="creator-card-bio">${escapeHTML(creator.bio)}</p>` : ""}
+                ${creator.category ? `<p><strong>Category:</strong> ${escapeHTML(creator.category)}</p>` : ""}
+                <p><strong>Specializations:</strong> ${creator.specializations.map(escapeHTML).join(", ") || "Not provided"}</p>
+                <p><strong>Tools / models:</strong> ${creator.tools.map(escapeHTML).join(", ") || "Not provided"}</p>
+                ${creator.rating !== null ? `<p><strong>⭐ ${escapeHTML(creator.rating)}</strong>${creator.reviewCount === null ? "" : ` · ${escapeHTML(creator.reviewCount)} mock reviews`}</p>` : ""}
+                ${creator.pricing.reel !== null ? `<p><strong>Mock price:</strong> ${formatCreatorCurrency(creator.pricing.reel)} / reel</p>` : ""}
                 <div class="creator-card-socials">${renderCreatorSocialLinks(creator.socialLinks)}</div>
                 <span class="creator-demo-indicator">MOCK PROFILE · DEMO DATA</span>
             </div>
             <div class="creator-bottom">
-                <span>⭐ ${escapeHTML(creator.rating)} <small>mock rating</small></span>
+                <span>${creator.rating === null ? "Rating not provided" : `⭐ ${escapeHTML(creator.rating)} <small>mock rating</small>`}</span>
                 <button type="button" class="creator-view-button">View Profile</button>
             </div>
             <div class="creator-card-actions">
@@ -539,6 +573,7 @@ function viewCreator(name) {
     popup.className =
         "profile-popup";
 
+    const roleLocation = [creator.role, creator.location].filter(Boolean).map(escapeHTML).join(" · ");
 
     const portfolioHTML = creator.portfolioItems.map((item, index) => {
         const media = item.mediaUrl
@@ -573,34 +608,36 @@ function viewCreator(name) {
             <div class="profile-hero">
                 <div class="profile-avatar">${escapeHTML(creator.name.substring(0, 2).toUpperCase())}</div>
                 <div>
-                    <p class="profile-role">${escapeHTML(creator.role)} · ${escapeHTML(creator.location)}</p>
+                    ${roleLocation ? `<p class="profile-role">${roleLocation}</p>` : ""}
                     <h2 id="creatorProfileHeading">${escapeHTML(creator.name)}</h2>
                     <p class="profile-specialization">${escapeHTML(creator.specialization)}</p>
                 </div>
             </div>
-            <p class="profile-bio">${escapeHTML(creator.bio)}</p>
-            <div class="profile-demo-notice">MOCK / DEMO PROFILE: creator details, ratings, reviews, revenue, prices, project history, social handles, and portfolio examples are fictional sample data.</div>
+            ${creator.bio ? `<p class="profile-bio">${escapeHTML(creator.bio)}</p>` : ""}
+            <div class="profile-demo-notice">SAMPLE / DEMO PROFILE. Only the fields shown below were supplied; missing details are not provided, and no verification claims are made.</div>
             <section class="profile-detail profile-social-section">
                 <h3>Mock social profiles <span>Sample links · replace with verified accounts</span></h3>
                 <div class="profile-social-links">${renderCreatorSocialLinks(creator.socialLinks)}</div>
             </section>
             <div class="profile-verification" aria-label="Sample verification indicators">
-                <span>Tools · ${creator.verification.tools ? "demo signal" : "not supplied"}</span>
-                <span>Workflow · ${creator.verification.workflow ? "demo signal" : "not supplied"}</span>
-                <span>Past work · ${creator.verification.pastWork ? "demo signal" : "not supplied"}</span>
+                <span>Creator claimed · Tools: ${creator.verification.tools ? "sample signal" : "not supplied"}</span>
+                <span>Evidence checked · Workflow: ${creator.verification.workflow ? "sample signal" : "not supplied"}</span>
+                <span>Verified · Past work: ${creator.verification.pastWork ? "sample signal" : "not supplied"}</span>
             </div>
             <div class="profile-info">
-                <span>⭐ ${escapeHTML(creator.rating)} mock rating · ${escapeHTML(creator.reviewCount)} mock reviews</span>
-                <span>🎯 ${escapeHTML(creator.projects)} mock projects</span>
-                <span>🤖 ${escapeHTML(creator.match)}% demo match</span>
+                ${creator.rating !== null ? `<span>⭐ ${escapeHTML(creator.rating)} mock rating</span>` : ""}
+                ${creator.reviewCount !== null ? `<span>${escapeHTML(creator.reviewCount)} mock reviews</span>` : ""}
+                ${creator.projects !== null ? `<span>🎯 ${escapeHTML(creator.projects)} mock projects</span>` : ""}
+                ${creator.match !== null ? `<span>🤖 ${escapeHTML(creator.match)}% demo match</span>` : ""}
+                ${creator.rating === null && creator.reviewCount === null ? "<span>Rating and reviews not provided</span>" : ""}
             </div>
             <div class="profile-detail-grid">
                 <section class="profile-detail">
                     <h3>Mock project history</h3>
                     <div class="profile-stat-list">
-                        <p><span>Total projects</span><strong>${escapeHTML(creator.projects)}</strong></p>
-                        <p><span>Completed</span><strong>${escapeHTML(creator.projectStats.completed)}</strong></p>
-                        <p><span>Active</span><strong>${escapeHTML(creator.projectStats.inProgress)}</strong></p>
+                        <p><span>Total projects</span><strong>${displayOptionalValue(creator.projects)}</strong></p>
+                        <p><span>Completed</span><strong>${displayOptionalValue(creator.projectStats.completed)}</strong></p>
+                        <p><span>Active</span><strong>${displayOptionalValue(creator.projectStats.inProgress)}</strong></p>
                     </div>
                 </section>
                 <section class="profile-detail">
@@ -608,7 +645,6 @@ function viewCreator(name) {
                     <div class="profile-stat-list">
                         <p><span>Total revenue</span><strong>${formatCreatorCurrency(creator.revenue.total)}</strong></p>
                         <p><span>This month</span><strong>${formatCreatorCurrency(creator.revenue.thisMonth)}</strong></p>
-                        <p><span>Completed campaigns</span><strong>${formatCreatorCurrency(creator.revenue.completedCampaigns)}</strong></p>
                     </div>
                 </section>
                 <section class="profile-detail">
@@ -624,8 +660,12 @@ function viewCreator(name) {
                     <div class="profile-tags">${creator.skills.map(skill => `<span>${escapeHTML(skill)}</span>`).join("")}</div>
                 </section>
                 <section class="profile-detail">
-                    <h3>AI tools &amp; models</h3>
-                    <div class="profile-tags">${creator.aiTools.map(tool => `<span>${escapeHTML(tool)}</span>`).join("")}</div>
+                    <h3>Specializations</h3>
+                    <div class="profile-tags">${creator.specializations.map(specialization => `<span>${escapeHTML(specialization)}</span>`).join("") || "Not provided"}</div>
+                </section>
+                <section class="profile-detail">
+                    <h3>Tools &amp; models</h3>
+                    <div class="profile-tags">${creator.tools.map(tool => `<span>${escapeHTML(tool)}</span>`).join("") || "Not provided"}</div>
                 </section>
                 <section class="profile-detail">
                     <h3>Workflow</h3>
@@ -638,21 +678,21 @@ function viewCreator(name) {
             </div>
             <section class="profile-reviews">
                 <div class="profile-section-heading">
-                    <div><h3>Mock customer feedback</h3><p>⭐ ${escapeHTML(creator.rating)} average · ${escapeHTML(creator.reviewCount)} mock reviews</p></div>
+                    <div><h3>Mock customer feedback</h3><p>${creator.rating === null ? "No rating or reviews provided." : `⭐ ${escapeHTML(creator.rating)} average · ${displayOptionalValue(creator.reviewCount)} mock reviews`}</p></div>
                 </div>
-                <div class="profile-review-grid">${creator.reviews.map(review => `
+                <div class="profile-review-grid">${creator.reviews.length ? creator.reviews.map(review => `
                     <article class="profile-review">
                         <p class="profile-review-stars" aria-label="${escapeHTML(review.rating)} out of 5 mock stars">${"★".repeat(review.rating)}${"☆".repeat(5 - review.rating)}</p>
                         <blockquote>“${escapeHTML(review.text)}”</blockquote>
                         <p class="profile-review-author">${escapeHTML(review.author)}</p>
                     </article>
-                `).join("")}</div>
+                `).join("") : "<p>No sample reviews provided.</p>"}</div>
             </section>
             <section class="profile-portfolio">
                 <div class="profile-section-heading">
                     <div><h3>Mock reels &amp; promotions</h3><p>Sample thumbnails, clients, and project statuses.</p></div>
                 </div>
-                <div class="portfolio-grid">${portfolioHTML}</div>
+                <div class="portfolio-grid">${portfolioHTML || "<p>No portfolio items provided for this demo profile.</p>"}</div>
             </section>
             <div class="profile-actions">
                 <button class="contact-btn" id="contactCreatorButton" type="button">Contact</button>
@@ -881,7 +921,7 @@ function openBriefForCreator(name) {
                 : type === "Social Media" ? "4:5 portrait" : "16:9 landscape";
         const toolMatches = creators
             .filter(creator => creator.role.toLowerCase().includes(type === "AI Video" ? "video" : type === "AI Image" ? "image" : type === "AI Ads" ? "advertisement" : "content"))
-            .flatMap(creator => creator.aiTools)
+            .flatMap(creator => creator.tools)
             .slice(0, 2);
         const sentence = idea.split(/[.!?]/)[0].trim();
         const title = sentence.length > 70 ? `${sentence.slice(0, 67).trim()}...` : sentence;

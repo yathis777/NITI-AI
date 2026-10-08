@@ -28,7 +28,7 @@ const model = getGenerativeModel(ai, {
         maxOutputTokens: 350,
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
     },
-    systemInstruction: `You are the helpful AI assistant for NITI AI, a marketplace that connects brands with AI creators. Answer in the same language as the user: use clear, friendly English for English questions, and natural Telugu for Telugu questions, including Telugu written in Latin letters. Support both English and Telugu. Explain how to discover creators, compare their listed skills, sign up or log in, post a project brief, and contact a creator. The listed creators are Arjun AI Studio (AI video, Reels, ads; Bangalore), Maya Creative (AI art, branding, design; Hyderabad), Pixel Gen AI (ads, social media, content; Chennai), and Vision AI Labs (AI ads, marketing, video; Mumbai). The site's demo match ratings are Arjun 96%, Maya 94%, Pixel Gen 92%, and Vision 90%; describe these as demo matches, not guaranteed results. Do not claim to have booked or contacted anyone, read private account information, or saved a brief. If asked something outside NITI AI, be helpful but concise, and say when you are unsure. Never ask the user to share passwords, API keys, or private information.`
+    systemInstruction: `You are the helpful NITI AI assistant. Answer in the same language as the user, including natural Telugu when appropriate. Help with creator discovery, project briefs, and writing creative prompts. Do not invent creator profiles, prices, reviews, verification, or match scores; this chat does not receive the live creator catalog, so direct users to the creator filters for current profile details. This chat returns text only and cannot generate or display images or videos. For image or video requests, clearly label any text prompt as "Prompt draft - not generated media"; use editable placeholders or ask a short clarifying question for missing details. Never say media was generated. Do not claim to have booked or contacted anyone, read private account information, or saved a brief. If unsure, say so. Never ask the user to share passwords, API keys, or private information.`
 });
 
 const panel = document.getElementById("nitiChat");
@@ -39,6 +39,17 @@ const input = document.getElementById("nitiChatInput");
 const sendButton = document.getElementById("nitiChatSend");
 const messages = document.getElementById("nitiChatMessages");
 const suggestions = document.getElementById("nitiChatSuggestions");
+const suggestionsToggle = document.getElementById("nitiChatSuggestionsToggle");
+const suggestionMenu = document.getElementById("nitiChatSuggestionMenu");
+
+suggestions.querySelectorAll("[data-question]").forEach(button => {
+    const menuButton = document.createElement("button");
+    menuButton.type = "button";
+    menuButton.role = "menuitem";
+    menuButton.dataset.question = button.dataset.question;
+    menuButton.textContent = button.textContent;
+    suggestionMenu.appendChild(menuButton);
+});
 
 function openChat() {
     panel.classList.add("open");
@@ -47,10 +58,22 @@ function openChat() {
     input.focus();
 }
 function closeChat() {
+    closeSuggestionMenu();
     panel.classList.remove("open");
     panel.setAttribute("aria-hidden", "true");
     launcher.setAttribute("aria-expanded", "false");
     launcher.focus();
+}
+function closeSuggestionMenu() {
+    suggestionMenu.hidden = true;
+    suggestionsToggle.setAttribute("aria-expanded", "false");
+}
+function selectSuggestion(event) {
+    const button = event.target.closest("[data-question]");
+    if (!button) return;
+    input.value = button.dataset.question;
+    closeSuggestionMenu();
+    input.focus();
 }
 function addMessage(text, role, extraClass = "") {
     const message = document.createElement("div");
@@ -67,43 +90,57 @@ function getReplyLanguage(text) {
     return "English";
 }
 
-function getInstantReply(question, language) {
+async function getInstantReply(question, language) {
     const query = question.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const telugu = language === "Telugu";
     if (/\b(hi|hello|hey|hii|namaste|namaskaram)\b/.test(query) || /హాయ్|హలో|నమస్కారం/.test(question.trim())) {
         return telugu ? "హాయ్! NITI AI creators లేదా project brief గురించి అడగండి. వెంటనే సహాయం చేస్తాను." : "Hi! Ask me about NITI AI creators or posting a project brief.";
     }
-    if (/\b(brief|project|hire|post|budget)\b/.test(query) || /ప్రాజెక్ట్|బ్రీఫ్|బడ్జెట్/.test(question)) {
+    if (/\b(how|where|steps?|instructions?)\b/.test(query) && /\b(brief|project|post|save)\b/.test(query) || /ఎలా.*(?:ప్రాజెక్ట్|బ్రీఫ్)/.test(question)) {
         return telugu
             ? "Project brief పెట్టడానికి “Post a Brief” ఎంచుకుని title, వివరాలు, project type, budget ఇవ్వండి. Save చేయడానికి sign in అవసరం."
             : "Choose “Post a Brief”, add a title, details, project type, and budget. Sign in is needed to save it.";
     }
 
-    const catalog = [
-        { name: "Arjun AI Studio", role: "AI Video Creator", city: "Bangalore", terms: ["video", "reels", "ads", "bangalore", "bengaluru"] },
-        { name: "Maya Creative", role: "AI Image Creator", city: "Hyderabad", terms: ["image", "art", "branding", "design", "hyderabad"] },
-        { name: "Pixel Gen AI", role: "AI Content Creator", city: "Chennai", terms: ["content", "ads", "social", "media", "chennai"] },
-        { name: "Vision AI Labs", role: "AI Advertisement Creator", city: "Mumbai", terms: ["advertisement", "marketing", "video", "mumbai"] }
-    ];
     const searchTerms = query.match(/[a-z0-9]+/g) || [];
-    const topicTerms = searchTerms.filter(term => !["a", "an", "and", "are", "can", "creator", "creators", "find", "for", "i", "in", "me", "need", "please", "show", "the", "to", "who", "with", "ai", "want"].includes(term));
-    const relevant = topicTerms.some(term => catalog.some(creator => creator.terms.includes(term)));
-    if (relevant) {
-        const matches = catalog.filter(creator => topicTerms.some(term => creator.terms.includes(term)));
-        return matches.length
-            ? (telugu ? "మీకు సరిపోయే creators:\n" : "Creators matching your search:\n") + matches.map(creator => `${creator.name} — ${creator.role}, ${creator.city}`).join("\n")
-            : (telugu ? "Creator కనబడలేదు. Video, design, ads లేదా city పేరు ప్రయత్నించండి." : "No creator found. Try video, design, ads, or a city name.");
+    const topicTerms = searchTerms.filter(term => !["a", "an", "and", "are", "ask", "can", "content", "creator", "creators", "find", "for", "help", "i", "in", "me", "need", "please", "show", "skills", "the", "to", "tools", "type", "want", "what", "who", "with", "ai"].includes(term));
+    const isCreatorSearch = /\b(creator|creators|find|recommend|hire)\b/.test(query);
+    if (isCreatorSearch && topicTerms.length) {
+        const catalog = await window.loadNitiCreatorDataset();
+        const matches = catalog.filter(creator => {
+            const searchable = [
+                creator.name, creator.role, creator.category, creator.location,
+                ...creator.skills, ...creator.specializations, ...creator.tools
+            ].join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return topicTerms.some(term => searchable.includes(term));
+        });
+        if (!matches.length) {
+            return telugu
+                ? "ఈ వివరాలతో creator కనబడలేదు. Skills, tools, specialization లేదా content type మార్చి ప్రయత్నించండి."
+                : "I couldn't find a creator with those details. Try a skill, tool, specialization, or content type.";
+        }
+        return (telugu ? "మీకు సరిపోయే creators:\n" : "Creators matching those profile details:\n") + matches.slice(0, 5).map(creator => {
+            const detail = [creator.role, creator.location].filter(Boolean).join(", ") || (telugu ? "వివరాలు ఇవ్వలేదు" : "profile details not provided");
+            return `${creator.name} — ${detail}`;
+        }).join("\n");
     }
     return null;
 }
 
 launcher.addEventListener("click", () => panel.classList.contains("open") ? closeChat() : openChat());
 closeButton.addEventListener("click", closeChat);
-suggestions.addEventListener("click", event => {
-    const button = event.target.closest("[data-question]");
-    if (!button) return;
-    input.value = button.dataset.question;
-    form.requestSubmit();
+suggestions.addEventListener("click", selectSuggestion);
+suggestionMenu.addEventListener("click", selectSuggestion);
+suggestionsToggle.addEventListener("click", () => {
+    const shouldOpen = suggestionMenu.hidden;
+    suggestionMenu.hidden = !shouldOpen;
+    suggestionsToggle.setAttribute("aria-expanded", String(shouldOpen));
+    if (shouldOpen) suggestionMenu.querySelector("button")?.focus();
+});
+document.addEventListener("click", event => {
+    if (!suggestionMenu.hidden && !suggestionMenu.contains(event.target) && !suggestionsToggle.contains(event.target)) {
+        closeSuggestionMenu();
+    }
 });
 form.addEventListener("submit", async event => {
     event.preventDefault();
@@ -113,15 +150,20 @@ form.addEventListener("submit", async event => {
     input.value = "";
     sendButton.disabled = true;
     const replyLanguage = getReplyLanguage(question);
-    const instantReply = getInstantReply(question, replyLanguage);
-    const pending = addMessage(instantReply || (replyLanguage === "Telugu" ? "సమాధానం తయారు చేస్తున్నాను…" : "Thinking…"), "assistant", instantReply ? "" : "pending");
-    if (instantReply) {
-        sendButton.disabled = false;
-        input.focus();
-        return;
-    }
+    const pending = addMessage(replyLanguage === "Telugu" ? "సమాధానం తయారు చేస్తున్నాను…" : "Thinking…", "assistant", "pending");
     try {
-        const prompt = `For this reply, answer only in ${replyLanguage}. Do not switch languages. User question: ${question}`;
+        const instantReply = await getInstantReply(question, replyLanguage);
+        if (instantReply) {
+            pending.textContent = instantReply;
+            pending.classList.remove("pending");
+            return;
+        }
+        const needsPromptDraft = /\b(image|picture|illustration|video|film|reel|clip)\b/i.test(question) &&
+            /\b(create|generate|make|draft|write|prompt|concept)\b/i.test(question);
+        const mediaInstruction = needsPromptDraft
+            ? `The user is asking about image/video creation. You can only return text, not media. Start with "Prompt draft — not generated media". If the user has not provided enough details, write a concise editable prompt template with clear placeholders and ask what to fill in. Never say you generated an image or video.`
+            : `You can only return text, not generated images or videos. If asked to create media, offer a clearly labeled prompt draft and never say you generated it.`;
+        const prompt = `For this reply, answer only in ${replyLanguage}. Do not switch languages. ${mediaInstruction} User question: ${question}`;
         const result = await model.generateContentStream(prompt);
         let answer = "";
         for await (const chunk of result.stream) {
@@ -162,5 +204,12 @@ form.addEventListener("submit", async event => {
     }
 });
 document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && panel.classList.contains("open")) closeChat();
-});
+    if (event.key !== "Escape" && event.key !== "Esc") return;
+    if (!suggestionMenu.hidden) {
+        event.preventDefault();
+        closeSuggestionMenu();
+        suggestionsToggle.focus();
+    } else if (panel.classList.contains("open")) {
+        closeChat();
+    }
+}, true);

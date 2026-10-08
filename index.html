@@ -140,31 +140,21 @@
                 </div>
 
                 <h3>
-                    AI Matching
+                    Brief-to-creator matching
                 </h3>
 
                 <p>
-                    Finding creators based on your project requirements.
+                    Prototype concept: compare brief requirements with creator profile fields.
                 </p>
 
 
                 <div class="match-percentage">
-                    94%
-                </div>
-
-
-                <div class="progress-container">
-
-                    <div
-                        class="progress-bar"
-                        id="matchProgress">
-                    </div>
-
+                    Demo
                 </div>
 
 
                 <small>
-                    Match accuracy
+                    Illustrative only · no AI service connected
                 </small>
 
             </div>
@@ -184,7 +174,7 @@
                 </h2>
 
                 <p>
-                    AI Creators
+                    AI Creators · demo data
                 </p>
 
             </div>
@@ -197,7 +187,7 @@
                 </h2>
 
                 <p>
-                    Brands
+                    Brands · demo data
                 </p>
 
             </div>
@@ -210,7 +200,7 @@
                 </h2>
 
                 <p>
-                    Projects
+                    Projects · demo data
                 </p>
 
             </div>
@@ -219,11 +209,11 @@
             <div class="stat">
 
                 <h2 id="statAccuracy">
-                    94%
+                    Demo
                 </h2>
 
                 <p>
-                    Match Accuracy
+                    Match accuracy · not measured
                 </p>
 
             </div>
@@ -272,16 +262,24 @@
                 <button type="submit">Search</button>
                 <div class="creator-filter-grid" aria-label="Filter creators">
                     <div class="creator-filter-field">
-                        <label for="creatorSkillFilter">Skill</label>
-                        <select id="creatorSkillFilter" onchange="applyCreatorFilters()">
-                            <option value="">All skills</option>
-                        </select>
+                        <span id="creatorSkillFilterLabel" class="creator-filter-label">Skills</span>
+                        <div id="creatorSkillFilter" class="creator-filter-options" role="group" aria-labelledby="creatorSkillFilterLabel"></div>
                     </div>
                     <div class="creator-filter-field">
                         <label for="creatorCategoryFilter">Category</label>
                         <select id="creatorCategoryFilter" onchange="applyCreatorFilters()">
                             <option value="">All categories</option>
                         </select>
+                    </div>
+                    <div class="creator-filter-field">
+                        <label for="creatorSpecializationFilter">Specialization</label>
+                        <select id="creatorSpecializationFilter" onchange="applyCreatorFilters()">
+                            <option value="">All specializations</option>
+                        </select>
+                    </div>
+                    <div class="creator-filter-field">
+                        <span id="creatorToolFilterLabel" class="creator-filter-label">Tools / models</span>
+                        <div id="creatorToolFilter" class="creator-filter-options" role="group" aria-labelledby="creatorToolFilterLabel"></div>
                     </div>
                     <div class="creator-filter-field">
                         <label for="creatorLocationFilter">Location</label>
@@ -530,7 +528,7 @@
             </div>
             <div class="creator-empty-state" id="creatorEmptyState" hidden>
                 <h3>No creators match those filters</h3>
-                <p>Try changing your search or clearing filters to see all available creators.</p>
+                <p>Try removing a selected skill or tool, changing the specialization, or clearing filters to see all available creators.</p>
                 <button type="button" onclick="clearCreatorFilters()">Reset search and filters</button>
             </div>
 

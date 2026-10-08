@@ -66,27 +66,23 @@ From a creator profile, brands can save an engagement request or start a brief w
 
 The site uses plain HTML, CSS, and browser JavaScript. Its creator catalog has one source of truth at `data/creators.csv`; `public/creator-data.js` fetches and validates that CSV before rendering cards and profiles. Search covers creator and portfolio text. Category, skill, location, and minimum-rating filters and the sort menu all operate on the loaded CSV records. While loading, the page announces its state; a failed/malformed CSV shows the error and a retry button rather than displaying stale records.
 
-All ten supplied records are fictional mock data. The visible page labels creator records, ratings, reviews, prices, and revenue as MOCK / DEMO data; replace them with verified information before using them as marketplace facts. All revenue and pricing columns contain integer Indian rupees (INR).
+The ten original records contain fictional mock data. Nani AI Studio is an additional sparse SAMPLE / DEMO profile containing only the creator details supplied for the prototype. The visible page labels mock creator records, ratings, reviews, prices, and revenue as MOCK / DEMO data; replace them with verified information before using them as marketplace facts. All revenue and pricing columns contain integer Indian rupees (INR).
 
 | Column | Type and meaning |
 | --- | --- |
 | `id` | Unique text identifier |
-| `name`, `location`, `category` | Text |
-| `skills` | JSON array of skill strings |
-| `rating` | Mock number from 0 to 5 |
-| `reviewCount` | Mock non-negative integer |
-| `totalRevenue`, `monthlyRevenue` | Mock non-negative integer INR |
-| `reelPrice`, `promotionPrice`, `storyPrice` | Mock non-negative integer INR |
-| `totalProjects`, `completedProjects`, `activeProjects` | Mock non-negative integers; total must equal completed plus active |
-| `socialLinks` | JSON array of `{ "platform": "...", "handle": "...", "url": "https://..." }` objects |
-| `portfolio` | JSON array of mock portfolio objects with `title`, `client`, `status` (`Completed` or `In progress`), `description`, `format`, `placeholder`, `toolsUsed`, and `commercialUse`; an optional `thumbnail` must be an HTTPS URL |
-| `reviews` | JSON array of 2–3 mock review objects: `author`, `rating` (integer 1–5), and `text` |
+| `name`, `location`, `category` | Text; location and category may be blank |
+| `skills`, `specializations`, `tools` | Separate JSON arrays of strings; skills, specializations, and tools are not interchangeable |
+| `rating`, `reviewCount`, revenue, prices, and project counts | Optional mock numeric values; leave blank when unknown. Revenue and prices are integer INR |
+| `socialLinks` | JSON array of `{ "platform": "...", "handle": "...", "url": "https://..." }` objects; use `[]` when none are supplied |
+| `portfolio` | JSON array of mock portfolio objects with `title`, `client`, `status` (`Completed` or `In progress`), `description`, `format`, `placeholder`, `toolsUsed`, and `commercialUse`; an optional `thumbnail` must be an HTTPS URL. Use `[]` when no items are supplied |
+| `reviews` | JSON array of 2–3 mock review objects (`author`, `rating` from 1–5, and `text`), or `[]` when no reviews are supplied |
 
 The JSON arrays and objects must be valid JSON inside their CSV cells. Quote a CSV cell containing commas, quotes, or line breaks with double quotes, and escape each embedded double quote by doubling it. Keep the header names and order shown in the example.
 
 ```csv
-id,name,location,category,skills,rating,reviewCount,totalRevenue,monthlyRevenue,reelPrice,promotionPrice,storyPrice,totalProjects,completedProjects,activeProjects,socialLinks,portfolio,reviews
-creator-001,Arjun AI Studio,Bengaluru,AI Video,"[""AI video"",""Reels"",""Product ads"",""Motion design""]",4.9,38,1845000,168000,18000,8500,12000,128,118,10,"[{""platform"":""Instagram"",""handle"":""@arjunai.demo"",""url"":""https://www.instagram.com/""}]","[{""title"":""Monsoon Sneaker Drop"",""client"":""Stride & Co. · mock brand"",""status"":""Completed"",""description"":""Mock product launch reel."",""format"":""9:16 · 20 sec"",""placeholder"":""video"",""toolsUsed"":[""Runway Gen-3""],""commercialUse"":""Mock sample · confirm license""}]","[{""author"":""Brand manager · mock review"",""rating"":5,""text"":""A polished sample campaign delivered on time.""},{""author"":""Marketing lead · mock review"",""rating"":5,""text"":""Clear communication and strong sample creative."" }]"
+id,name,location,category,skills,specializations,tools,rating,reviewCount,totalRevenue,monthlyRevenue,reelPrice,promotionPrice,storyPrice,totalProjects,completedProjects,activeProjects,socialLinks,portfolio,reviews
+creator-011,Nani AI Studio,,,"[""AI Video Generation"",""AI Filmmaking"",""Prompt Engineering"",""AI Advertising""]","[""AI Film & Video"",""Advertising & Campaign Creative""]","[""Runway"",""Kling AI"",""Midjourney"",""ElevenLabs""]",,,,,,,,,,,[],[],[]
 ```
 
 The browser derives the card role, short bio, tool list, project workflow, and content formats from these CSV fields. `public/data/creators.csv` is generated from the root CSV by `npm run prepare:hosting-data`; Firebase Hosting runs that sync automatically before deploying. The Docker image copies the same source CSV to its static document root. Do not edit the generated hosting copy.
