@@ -6,7 +6,8 @@
     "start": "node server.js",
     "prepare:hosting-data": "node scripts/sync-creator-data.js",
     "test:cloudflare-ai": "node --test cloudflare/src/index.test.mjs",
-    "test:admin": "node --test admin-access.test.js"
+    "test:admin": "node --test admin-access.test.js",
+    "admin:set-claims": "node scripts/set-admin-claims.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

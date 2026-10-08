@@ -15,15 +15,18 @@ The website keeps Firebase Authentication for account sign-in. MongoDB stores th
 
 ## Secure admin dashboard
 
-The static Firebase Hosting site (`public/`) saves contact requests and project briefs to Firestore. The full Express app at the repository root saves the same data types to MongoDB. The Express admin dashboard reads both stores, and looks up account email/display name through Firebase Authentication. A record contains a Firebase UID; contact requests do not independently store customer email.
+The free Firebase Hosting dashboard at `/admin` reads contact requests and project briefs directly from Firestore. Firestore security rules allow normal signed-in users to read only their own records; a Firebase Auth custom claim (`admin: true`) grants read-only access to these two collections for the configured administrator. New saves include the signed-in customer's email, which the rules validate against their Firebase Auth token; older records without an email still show their Firebase UID. No service-account key or database credential is included in browser code.
 
-1. Sign in to NITI AI with the account that should be an administrator, then find its Firebase user UID in **Firebase Console → Authentication → Users**.
-2. Add that UID to the private `.env` file as `ADMIN_UIDS=your-firebase-user-uid`. Multiple administrator UIDs can be comma-separated. The server checks this list after verifying the Firebase ID token; being signed in alone does not grant access. Do not configure an email address in place of a UID.
-3. Ensure the service account configured by `GOOGLE_APPLICATION_CREDENTIALS` can read Firestore and look up Firebase Authentication users. Keep its JSON key and `.env` private.
-4. For the Firebase Hosting data, set `ADMIN_DASHBOARD_ONLY=true` in `.env`, then start with `npm.cmd start`. In this mode MongoDB is not required, the app redirects `/` to `/admin`, and non-admin API routes are disabled. Set the value back to `false` to run the normal MongoDB-backed app. The dashboard displays records from Firestore and MongoDB when the normal app mode is used.
-5. Open `http://localhost:5500/admin` and sign in with the configured administrator account (email/password or Google, as enabled for that account). Use **Refresh** to reload records.
+The root Express app's MongoDB admin mode is for local development only. It reads MongoDB records as well as Firestore records, but the Firebase Hosting admin dashboard displays Firestore records only.
 
-The dashboard reports loading, empty, and error states and shows up to the latest 200 records per collection from each store. Firebase users can read only their own Firestore records under the existing Firestore rules; this dashboard's administrator-only API is enforced server-side. The admin page is served by the Express app, not Firebase Hosting. No database rules are changed by this feature. Do not deploy the app or change live rules without reviewing and explicitly approving those steps.
+To add an administrator:
+
+1. Sign in to Firebase Console and open **Authentication → Users**. Copy the user's Firebase UID.
+2. Set that UID in your private `.env` as `ADMIN_UIDS=your-firebase-user-uid`. The local service-account file configured by `GOOGLE_APPLICATION_CREDENTIALS` must have permission to manage Firebase Authentication custom claims.
+3. From the repository root, run `npm.cmd run admin:set-claims` to grant the `admin: true` claim to each configured UID. This command preserves any other custom claims. Each administrator must sign out and sign back in (or refresh their ID token) after claim changes.
+4. The Firebase Hosting deploy publishes the `/admin` route and `firestore.rules.txt`. Deploy from an account authorized to release Hosting and Firestore rules. Only records in the `briefs` and `contactRequests` collections receive the admin read exception; users' write restrictions and ownership checks remain in place.
+
+The dashboard reports loading, empty, and error states, supports Google or email/password sign-in, and shows up to the latest 200 records per collection. The deployed dashboard is <https://niti-ai-2ba5d.web.app/admin>. To run the Hosting emulator locally, use `firebase emulators:start --only hosting --project niti-ai-2ba5d` and open <http://127.0.0.1:5000/admin>; authentication and Firestore requests still use the configured Firebase project. A deployment updates the live Firestore rules; review them before deploying.
 
 ## Creator catalog local development
 

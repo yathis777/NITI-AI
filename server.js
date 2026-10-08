@@ -270,6 +270,7 @@ app.post("/api/contact-requests", requireFirebaseUser, async (req, res, next) =>
         const result = await req.db.collection("contactRequests").insertOne({
             creatorName: creatorName.trim(),
             userId: req.user.uid,
+            ...(req.user.email ? { userEmail: req.user.email } : {}),
             createdAt: new Date()
         });
         res.status(201).json({ id: result.insertedId });
@@ -324,6 +325,7 @@ app.post("/api/briefs", requireFirebaseUser, async (req, res, next) => {
             intendedChannels: intendedChannels.trim(),
             ...(selectedCreatorName ? { selectedCreatorName: selectedCreatorName.trim() } : {}),
             userId: req.user.uid,
+            ...(req.user.email ? { userEmail: req.user.email } : {}),
             createdAt: new Date()
         });
         res.status(201).json({ id: result.insertedId });

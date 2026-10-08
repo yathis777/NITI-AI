@@ -1370,6 +1370,7 @@ async function contactCreator(name, button) {
         await window.nitiDb.collection("contactRequests").add({
             creatorName: name,
             userId: currentNitiUser.uid,
+            ...(currentNitiUser.email ? { userEmail: currentNitiUser.email } : {}),
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         const box = document.querySelector(".profile-box");
@@ -1430,6 +1431,7 @@ async function submitBrief(event) {
         await window.nitiDb.collection("briefs").add({
             ...brief,
             userId: currentNitiUser.uid,
+            ...(currentNitiUser.email ? { userEmail: currentNitiUser.email } : {}),
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         showBriefSuccess(brief);
