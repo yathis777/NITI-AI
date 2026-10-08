@@ -314,12 +314,16 @@ button {
 /* ================= SEARCH ================= */
 
 .creator-search {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     max-width: 550px;
     margin: 0 auto 40px;
 }
 
 .creator-search input {
-    width: 100%;
+    min-width: 0;
+    flex: 1;
     padding: 15px 20px;
 
     border: 1px solid #334155;
@@ -331,6 +335,24 @@ button {
     color: white;
 
     font-size: 16px;
+}
+
+.creator-search button {
+    padding: 0 22px;
+    border: 0;
+    border-radius: 30px;
+    background: #00d9ff;
+    color: #06121f;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.creator-search-results {
+    flex-basis: 100%;
+    margin: 0 0 0 12px;
+    color: #a9bed3;
+    font-size: 14px;
 }
 
 .creator-search input:focus {

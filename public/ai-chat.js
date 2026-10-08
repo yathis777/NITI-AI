@@ -20,9 +20,9 @@ if (appCheckSiteKey) {
 const ai = getAI(app, { backend: new GoogleAIBackend() });
 const model = getGenerativeModel(ai, {
     model: "gemini-3.8-flash",
+    generationConfig: { temperature: 0.35, maxOutputTokens: 350 },
     systemInstruction: `You are the helpful AI assistant for NITI AI, a marketplace that connects brands with AI creators. Answer in the same language as the user: use clear, friendly English for English questions, and natural Telugu for Telugu questions, including Telugu written in Latin letters. Support both English and Telugu. Explain how to discover creators, compare their listed skills, sign up or log in, post a project brief, and contact a creator. The listed creators are Arjun AI Studio (AI video, Reels, ads; Bangalore), Maya Creative (AI art, branding, design; Hyderabad), Pixel Gen AI (ads, social media, content; Chennai), and Vision AI Labs (AI ads, marketing, video; Mumbai). The site's demo match ratings are Arjun 96%, Maya 94%, Pixel Gen 92%, and Vision 90%; describe these as demo matches, not guaranteed results. Do not claim to have booked or contacted anyone, read private account information, or saved a brief. If asked something outside NITI AI, be helpful but concise, and say when you are unsure. Never ask the user to share passwords, API keys, or private information.`
 });
-const chat = model.startChat({ generationConfig: { temperature: 0.55, maxOutputTokens: 700 } });
 
 const panel = document.getElementById("nitiChat");
 const launcher = document.getElementById("nitiChatLauncher");
@@ -60,6 +60,36 @@ function getReplyLanguage(text) {
     return "English";
 }
 
+function getInstantReply(question, language) {
+    const query = question.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const telugu = language === "Telugu";
+    if (/\b(hi|hello|hey|hii|namaste|namaskaram)\b/.test(query) || /హాయ్|హలో|నమస్కారం/.test(question.trim())) {
+        return telugu ? "హాయ్! NITI AI creators లేదా project brief గురించి అడగండి. వెంటనే సహాయం చేస్తాను." : "Hi! Ask me about NITI AI creators or posting a project brief.";
+    }
+    if (/\b(brief|project|hire|post|budget)\b/.test(query) || /ప్రాజెక్ట్|బ్రీఫ్|బడ్జెట్/.test(question)) {
+        return telugu
+            ? "Project brief పెట్టడానికి “Post a Brief” ఎంచుకుని title, వివరాలు, project type, budget ఇవ్వండి. Save చేయడానికి sign in అవసరం."
+            : "Choose “Post a Brief”, add a title, details, project type, and budget. Sign in is needed to save it.";
+    }
+
+    const catalog = [
+        { name: "Arjun AI Studio", role: "AI Video Creator", city: "Bangalore", terms: ["video", "reels", "ads", "bangalore", "bengaluru"] },
+        { name: "Maya Creative", role: "AI Image Creator", city: "Hyderabad", terms: ["image", "art", "branding", "design", "hyderabad"] },
+        { name: "Pixel Gen AI", role: "AI Content Creator", city: "Chennai", terms: ["content", "ads", "social", "media", "chennai"] },
+        { name: "Vision AI Labs", role: "AI Advertisement Creator", city: "Mumbai", terms: ["advertisement", "marketing", "video", "mumbai"] }
+    ];
+    const searchTerms = query.match(/[a-z0-9]+/g) || [];
+    const topicTerms = searchTerms.filter(term => !["a", "an", "and", "are", "can", "creator", "creators", "find", "for", "i", "in", "me", "need", "please", "show", "the", "to", "who", "with", "ai", "want"].includes(term));
+    const relevant = topicTerms.some(term => catalog.some(creator => creator.terms.includes(term)));
+    if (relevant) {
+        const matches = catalog.filter(creator => topicTerms.some(term => creator.terms.includes(term)));
+        return matches.length
+            ? (telugu ? "మీకు సరిపోయే creators:\n" : "Creators matching your search:\n") + matches.map(creator => `${creator.name} — ${creator.role}, ${creator.city}`).join("\n")
+            : (telugu ? "Creator కనబడలేదు. Video, design, ads లేదా city పేరు ప్రయత్నించండి." : "No creator found. Try video, design, ads, or a city name.");
+    }
+    return null;
+}
+
 launcher.addEventListener("click", () => panel.classList.contains("open") ? closeChat() : openChat());
 closeButton.addEventListener("click", closeChat);
 suggestions.addEventListener("click", event => {
@@ -76,10 +106,16 @@ form.addEventListener("submit", async event => {
     input.value = "";
     sendButton.disabled = true;
     const replyLanguage = getReplyLanguage(question);
-    const pending = addMessage(replyLanguage === "Telugu" ? "సమాధానం తయారు చేస్తున్నాను…" : "Thinking…", "assistant", "pending");
+    const instantReply = getInstantReply(question, replyLanguage);
+    const pending = addMessage(instantReply || (replyLanguage === "Telugu" ? "సమాధానం తయారు చేస్తున్నాను…" : "Thinking…"), "assistant", instantReply ? "" : "pending");
+    if (instantReply) {
+        sendButton.disabled = false;
+        input.focus();
+        return;
+    }
     try {
         const prompt = `For this reply, answer only in ${replyLanguage}. Do not switch languages. User question: ${question}`;
-        const result = await chat.sendMessage(prompt);
+        const result = await model.generateContent(prompt);
         const answer = result.response.text();
         pending.textContent = answer || (replyLanguage === "Telugu" ? "క్షమించండి, ఇప్పుడే సమాధానం రాలేదు. మళ్లీ ప్రయత్నించండి." : "Sorry, I couldn't generate an answer just now. Please try again.");
         pending.classList.remove("pending");

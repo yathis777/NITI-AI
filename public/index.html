@@ -258,15 +258,16 @@
 
             <!-- SEARCH -->
 
-            <div class="creator-search">
-
+            <form class="creator-search" id="creatorSearchForm" onsubmit="searchCreators(document.getElementById('creatorSearch').value); return false;">
+                <label class="sr-only" for="creatorSearch">Search creators by name, skill, role, or city</label>
                 <input
-                    type="text"
+                    type="search"
                     id="creatorSearch"
-                    placeholder="🔍 Search creators..."
+                    placeholder="🔍 Search by name, skill, role, or city..."
                     oninput="searchCreators(this.value)">
-
-            </div>
+                <button type="submit">Search</button>
+                <p id="creatorSearchResults" class="creator-search-results" role="status" aria-live="polite">Showing all 4 creators.</p>
+            </form>
 
 
 

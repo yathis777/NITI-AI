@@ -69,10 +69,8 @@ function findCreators() {
 
     }
 
-    showNotification(
-        "AI Creator Search",
-        "Showing the best AI creators for you."
-    );
+    const searchInput = document.getElementById("creatorSearch");
+    if (searchInput) searchInput.focus({ preventScroll: true });
 
 }
 
@@ -82,31 +80,35 @@ function findCreators() {
 ========================= */
 
 function searchCreators(searchText) {
-
-    const cards =
-        document.querySelectorAll(".creator-card");
-
-    const search =
-        searchText.toLowerCase().trim();
-
+    const cards = document.querySelectorAll(".creator-card");
+    const terms = String(searchText || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    let visibleCount = 0;
 
     cards.forEach(card => {
-
-        const text =
-            card.innerText.toLowerCase();
-
-        if (text.includes(search)) {
-
-            card.style.display = "";
-
-        } else {
-
-            card.style.display = "none";
-
-        }
-
+        const searchableText = `${card.dataset.creator || ""} ${card.innerText || ""}`
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+        const isMatch = terms.every(term => searchableText.includes(term));
+        card.hidden = !isMatch;
+        card.style.display = isMatch ? "" : "none";
+        if (isMatch) visibleCount += 1;
     });
 
+    const status = document.getElementById("creatorSearchResults");
+    if (status) {
+        status.textContent = terms.length === 0
+            ? `Showing all ${visibleCount} creators.`
+            : visibleCount === 0
+                ? `No creators found for “${String(searchText).trim()}”. Try video, design, ads, or a city.`
+                : `${visibleCount} creator${visibleCount === 1 ? "" : "s"} found.`;
+    }
 }
 
 
