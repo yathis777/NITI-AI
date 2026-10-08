@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getAI, getGenerativeModel, GoogleAIBackend } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-ai.js";
+import { getAI, getGenerativeModel, GoogleAIBackend, ThinkingLevel } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-ai.js";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check.js";
 
 const firebaseConfig = {
@@ -20,7 +20,11 @@ if (appCheckSiteKey) {
 const ai = getAI(app, { backend: new GoogleAIBackend() });
 const model = getGenerativeModel(ai, {
     model: "gemini-3.8-flash",
-    generationConfig: { temperature: 0.35, maxOutputTokens: 350 },
+    generationConfig: {
+        temperature: 0.35,
+        maxOutputTokens: 350,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+    },
     systemInstruction: `You are the helpful AI assistant for NITI AI, a marketplace that connects brands with AI creators. Answer in the same language as the user: use clear, friendly English for English questions, and natural Telugu for Telugu questions, including Telugu written in Latin letters. Support both English and Telugu. Explain how to discover creators, compare their listed skills, sign up or log in, post a project brief, and contact a creator. The listed creators are Arjun AI Studio (AI video, Reels, ads; Bangalore), Maya Creative (AI art, branding, design; Hyderabad), Pixel Gen AI (ads, social media, content; Chennai), and Vision AI Labs (AI ads, marketing, video; Mumbai). The site's demo match ratings are Arjun 96%, Maya 94%, Pixel Gen 92%, and Vision 90%; describe these as demo matches, not guaranteed results. Do not claim to have booked or contacted anyone, read private account information, or saved a brief. If asked something outside NITI AI, be helpful but concise, and say when you are unsure. Never ask the user to share passwords, API keys, or private information.`
 });
 
@@ -115,8 +119,20 @@ form.addEventListener("submit", async event => {
     }
     try {
         const prompt = `For this reply, answer only in ${replyLanguage}. Do not switch languages. User question: ${question}`;
-        const result = await model.generateContent(prompt);
-        const answer = result.response.text();
+        const result = await model.generateContentStream(prompt);
+        let answer = "";
+        for await (const chunk of result.stream) {
+            const text = chunk.text();
+            if (!text) continue;
+            answer += text;
+            pending.textContent = answer;
+            pending.classList.remove("pending");
+            messages.scrollTop = messages.scrollHeight;
+        }
+        if (!answer) {
+            const response = await result.response;
+            answer = response.text();
+        }
         pending.textContent = answer || (replyLanguage === "Telugu" ? "క్షమించండి, ఇప్పుడే సమాధానం రాలేదు. మళ్లీ ప్రయత్నించండి." : "Sorry, I couldn't generate an answer just now. Please try again.");
         pending.classList.remove("pending");
     } catch (error) {

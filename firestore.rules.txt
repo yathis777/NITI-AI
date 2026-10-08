@@ -8,11 +8,65 @@ service cloud.firestore {
     match /briefs/{briefId} {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll([
+          'title', 'brand', 'goal', 'description', 'type', 'visualStyle',
+          'visualReferences', 'deliverables', 'quantity', 'format',
+          'targetPlatform', 'requiredTools', 'preferredTools', 'deadline',
+          'budget', 'commercialUseRequired', 'usageDuration',
+          'intendedChannels', 'userId', 'createdAt'
+        ])
         && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.brand is string
+        && request.resource.data.brand.size() > 0
+        && request.resource.data.brand.size() <= 120
+        && request.resource.data.goal is string
+        && request.resource.data.goal.size() > 0
+        && request.resource.data.goal.size() <= 200
         && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 5000
         && request.resource.data.type is string
+        && request.resource.data.type in ['AI Video', 'AI Image', 'AI Ads', 'Social Media']
+        && request.resource.data.visualStyle is string
+        && request.resource.data.visualStyle.size() > 0
+        && request.resource.data.visualStyle.size() <= 500
+        && request.resource.data.visualReferences is string
+        && request.resource.data.visualReferences.size() <= 2000
+        && request.resource.data.deliverables is string
+        && request.resource.data.deliverables.size() > 0
+        && request.resource.data.deliverables.size() <= 2000
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity > 0
+        && request.resource.data.quantity <= 1000
+        && request.resource.data.format is string
+        && request.resource.data.format.size() > 0
+        && request.resource.data.format.size() <= 80
+        && request.resource.data.targetPlatform is string
+        && request.resource.data.targetPlatform.size() > 0
+        && request.resource.data.targetPlatform.size() <= 120
+        && request.resource.data.requiredTools is string
+        && request.resource.data.requiredTools.size() <= 500
+        && request.resource.data.preferredTools is string
+        && request.resource.data.preferredTools.size() <= 500
+        && request.resource.data.deadline is string
+        && request.resource.data.deadline.matches('^\\d{4}-\\d{2}-\\d{2}$')
         && request.resource.data.budget is number
-        && request.resource.data.budget > 0;
+        && request.resource.data.budget > 0
+        && request.resource.data.commercialUseRequired is bool
+        && request.resource.data.usageDuration is string
+        && request.resource.data.usageDuration.size() > 0
+        && request.resource.data.usageDuration.size() <= 120
+        && request.resource.data.intendedChannels is string
+        && request.resource.data.intendedChannels.size() > 0
+        && request.resource.data.intendedChannels.size() <= 500
+        && (!('selectedCreatorName' in request.resource.data)
+          || (request.resource.data.selectedCreatorName is string
+            && request.resource.data.selectedCreatorName.size() > 0
+            && request.resource.data.selectedCreatorName.size() <= 120))
+        && request.resource.data.userId is string
+        && request.resource.data.createdAt is timestamp;
       allow read, update, delete: if signedIn()
         && resource.data.userId == request.auth.uid;
     }
@@ -20,7 +74,9 @@ service cloud.firestore {
     match /contactRequests/{requestId} {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.creatorName is string;
+        && request.resource.data.creatorName is string
+        && request.resource.data.creatorName.size() > 0
+        && request.resource.data.creatorName.size() <= 120;
       allow read: if signedIn()
         && resource.data.userId == request.auth.uid;
       allow update, delete: if false;

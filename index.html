@@ -258,24 +258,67 @@
 
             <!-- SEARCH -->
 
-            <div class="creator-search">
+            <p class="creator-data-disclaimer">MOCK / DEMO DATA: every creator record, rating, review, price, and revenue figure on this page is fictional sample data.</p>
+            <p class="creator-data-status" id="creatorDataStatus" role="status" aria-live="polite">Loading mock creator data…</p>
+            <button class="creator-data-retry" id="creatorDataRetry" type="button" onclick="loadCreatorData()" hidden>Retry loading creators</button>
 
+            <form class="creator-search" id="creatorSearchForm" onsubmit="applyCreatorFilters(); return false;" hidden>
+                <label class="sr-only" for="creatorSearch">Search creators by name, skill, role, or city</label>
                 <input
-                    type="text"
+                    type="search"
                     id="creatorSearch"
-                    aria-label="Search creators by name, skill, role, or city"
                     placeholder="🔍 Search by name, skill, role, or city..."
                     oninput="searchCreators(this.value)">
+                <button type="submit">Search</button>
+                <div class="creator-filter-grid" aria-label="Filter creators">
+                    <div class="creator-filter-field">
+                        <label for="creatorSkillFilter">Skill</label>
+                        <select id="creatorSkillFilter" onchange="applyCreatorFilters()">
+                            <option value="">All skills</option>
+                        </select>
+                    </div>
+                    <div class="creator-filter-field">
+                        <label for="creatorCategoryFilter">Category</label>
+                        <select id="creatorCategoryFilter" onchange="applyCreatorFilters()">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
+                    <div class="creator-filter-field">
+                        <label for="creatorLocationFilter">Location</label>
+                        <select id="creatorLocationFilter" onchange="applyCreatorFilters()">
+                            <option value="">All locations</option>
+                        </select>
+                    </div>
+                    <div class="creator-filter-field">
+                        <label for="creatorRatingFilter">Minimum mock rating</label>
+                        <select id="creatorRatingFilter" onchange="applyCreatorFilters()">
+                            <option value="">Any rating</option>
+                            <option value="4">4.0+</option>
+                            <option value="4.5">4.5+</option>
+                        </select>
+                    </div>
+                    <div class="creator-filter-field">
+                        <label for="creatorSort">Sort creators</label>
+                        <select id="creatorSort" onchange="applyCreatorFilters()">
+                            <option value="rating">Top mock rated</option>
+                            <option value="reviews">Most mock reviews</option>
+                            <option value="revenue">Highest mock total revenue</option>
+                            <option value="monthly">Highest mock monthly revenue</option>
+                            <option value="reel">Lowest mock reel price</option>
+                            <option value="projects">Most mock projects</option>
+                            <option value="name">Name A–Z</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="creator-search-actions">
+                    <p id="creatorSearchResults" class="creator-search-results" role="status" aria-live="polite">Loading creators…</p>
+                    <button class="creator-clear-filters" type="button" onclick="clearCreatorFilters()">Clear all filters</button>
+                </div>
+            </form>
 
-                <p id="creatorSearchResults" class="creator-search-results" role="status" aria-live="polite">
-                    Showing all 4 creators.
-                </p>
-
-            </div>
 
 
-
-            <div class="creator-grid">
+            <div class="creator-grid" aria-label="Mock creator profiles" hidden>
 
 
                 <!-- CREATOR 1 -->
@@ -485,6 +528,11 @@
                 </div>
 
             </div>
+            <div class="creator-empty-state" id="creatorEmptyState" hidden>
+                <h3>No creators match those filters</h3>
+                <p>Try changing your search or clearing filters to see all available creators.</p>
+                <button type="button" onclick="clearCreatorFilters()">Reset search and filters</button>
+            </div>
 
         </section>
 
@@ -658,15 +706,19 @@
             </p>
 
 
+            <label class="sr-only" for="email">Email address</label>
             <input
                 type="email"
                 id="email"
+                autocomplete="email"
                 placeholder="Enter your email">
 
 
+            <label class="sr-only" for="password">Password</label>
             <input
                 type="password"
                 id="password"
+                autocomplete="current-password"
                 placeholder="Enter your password">
 
 
@@ -734,6 +786,7 @@
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
     <script src="firebase-config.js"></script>
+    <script src="creator-data.js"></script>
     <script src="script.js"></script>
 
 </body>

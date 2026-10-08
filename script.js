@@ -7,49 +7,78 @@
    CREATOR DATA
 ========================= */
 
-const creators = [
+let creators = [];
 
-    {
-        name: "Arjun AI Studio",
-        role: "AI Video Creator",
-        rating: 4.9,
-        projects: 128,
-        skills: ["AI Video", "Reels", "Ads"],
-        location: "Bangalore",
-        match: 96
-    },
+function formatCreatorCurrency(amount) {
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0
+    }).format(amount);
+}
 
-    {
-        name: "Maya Creative",
-        role: "AI Image Creator",
-        rating: 4.8,
-        projects: 96,
-        skills: ["AI Art", "Branding", "Design"],
-        location: "Hyderabad",
-        match: 94
-    },
+function renderCreatorSocialLinks(links) {
+    return links.map(link => `
+        <a class="profile-social-link" href="${escapeHTML(link.url)}" target="_blank" rel="noopener noreferrer">
+            <span>${escapeHTML(link.platform)}</span>
+            <strong>${escapeHTML(link.handle)}</strong>
+        </a>
+    `).join("");
+}
 
-    {
-        name: "Pixel Gen AI",
-        role: "AI Content Creator",
-        rating: 4.9,
-        projects: 154,
-        skills: ["Ads", "Social Media", "Content"],
-        location: "Chennai",
-        match: 92
-    },
+function getCreatorSearchText(creator) {
+    return [
+        creator.name,
+        creator.id,
+        creator.category,
+        creator.role,
+        creator.location,
+        creator.specialization,
+        creator.bio,
+        ...creator.skills,
+        ...creator.aiTools,
+        ...creator.contentTypes,
+        ...creator.socialLinks.flatMap(link => [link.platform, link.handle]),
+        ...creator.portfolioItems.flatMap(item => [item.title, item.client, item.status, item.description, item.format, ...item.toolsUsed]),
+        ...creator.reviews.flatMap(review => [review.author, review.text]),
+        creator.rating, creator.reviewCount, creator.revenue.total, creator.revenue.thisMonth,
+        creator.pricing.reel, creator.pricing.promotionalPost, creator.pricing.storyPackage
+    ].join(" ");
+}
 
-    {
-        name: "Vision AI Labs",
-        role: "AI Advertisement Creator",
-        rating: 4.7,
-        projects: 87,
-        skills: ["AI Ads", "Marketing", "Video"],
-        location: "Mumbai",
-        match: 90
+async function loadCreatorData() {
+    const status = document.getElementById("creatorDataStatus");
+    const retry = document.getElementById("creatorDataRetry");
+    const searchForm = document.getElementById("creatorSearchForm");
+    const grid = document.querySelector(".creator-grid");
+    if (!status || !searchForm || !grid || typeof window.loadNitiCreatorDataset !== "function") {
+        throw new Error("Creator data loader or page status elements are missing.");
     }
 
-];
+    status.textContent = "Loading mock creator data…";
+    status.dataset.state = "loading";
+    retry.hidden = true;
+    searchForm.hidden = true;
+    grid.hidden = true;
+    try {
+        if (typeof window.loadNitiCreatorDataset !== "function") {
+            throw new Error("The creator CSV loader script did not load.");
+        }
+        creators = await window.loadNitiCreatorDataset();
+        renderCreatorCards();
+        initializeCreatorFilters();
+        searchForm.hidden = false;
+        grid.hidden = false;
+        applyCreatorFilters();
+        status.textContent = `Loaded ${creators.length} mock creator records. Ratings, reviews, prices, and revenue are demo data.`;
+        status.dataset.state = "success";
+    } catch (error) {
+        console.error("Could not load creator dataset:", error);
+        status.textContent = `Could not load creator data: ${error.message}`;
+        status.dataset.state = "error";
+        retry.hidden = false;
+    }
+}
 
 let medicalReportAnswers = null;
 let nitiConversation = [];
@@ -84,34 +113,9 @@ function findCreators() {
 ========================= */
 
 function searchCreators(searchText) {
-
-    const cards =
-        document.querySelectorAll(".creator-card");
-
-    const terms = normalizeSearchText(searchText).split(/\s+/).filter(Boolean);
-    let visibleCount = 0;
-
-    cards.forEach(card => {
-        const creator = creators.find(item => item.name === card.dataset.creator);
-        const searchableText = normalizeSearchText(creator
-            ? [creator.name, creator.role, creator.location, ...creator.skills].join(" ")
-            : card.innerText);
-        const isMatch = terms.every(term => searchableText.includes(term));
-        card.style.display = isMatch ? "" : "none";
-        if (isMatch) visibleCount += 1;
-    });
-
-    const response = document.getElementById("creatorSearchResults");
-    if (!response) return;
-
-    if (terms.length === 0) {
-        response.textContent = `Showing all ${visibleCount} creators.`;
-    } else if (visibleCount === 0) {
-        response.textContent = `No creators found for "${searchText.trim()}". Try a skill, role, or city.`;
-    } else {
-        response.textContent = `${visibleCount} creator${visibleCount === 1 ? "" : "s"} found.`;
-    }
-
+    const input = document.getElementById("creatorSearch");
+    if (input && input.value !== searchText) input.value = searchText;
+    applyCreatorFilters();
 }
 
 function normalizeSearchText(value) {
@@ -120,6 +124,149 @@ function normalizeSearchText(value) {
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .trim();
+}
+
+function getSelectedCreatorFilters() {
+    return {
+        skill: document.getElementById("creatorSkillFilter")?.value || "",
+        category: document.getElementById("creatorCategoryFilter")?.value || "",
+        location: document.getElementById("creatorLocationFilter")?.value || "",
+        rating: Number(document.getElementById("creatorRatingFilter")?.value || 0)
+    };
+}
+
+function initializeCreatorFilters() {
+    const filterOptions = [
+        {
+            id: "creatorSkillFilter",
+            values: creators.flatMap(creator => creator.skills),
+            placeholder: "All skills"
+        },
+        {
+            id: "creatorCategoryFilter",
+            values: creators.map(creator => creator.category),
+            placeholder: "All categories"
+        },
+        {
+            id: "creatorLocationFilter",
+            values: creators.map(creator => creator.location),
+            placeholder: "All locations"
+        }
+    ];
+
+    filterOptions.forEach(({ id, values, placeholder }) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const options = [...new Set(values)].sort((a, b) => a.localeCompare(b));
+        select.innerHTML = `<option value="">${placeholder}</option>` +
+            options.map(value => `<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("");
+    });
+
+}
+
+function applyCreatorFilters() {
+    const input = document.getElementById("creatorSearch");
+    const terms = normalizeSearchText(input ? input.value : "").split(/\s+/).filter(Boolean);
+    const filters = getSelectedCreatorFilters();
+    const matchingCreators = creators.filter(creator =>
+        terms.every(term => normalizeSearchText(getCreatorSearchText(creator)).includes(term))
+        && (!filters.skill || creator.skills.some(value => normalizeSearchText(value) === normalizeSearchText(filters.skill)))
+        && (!filters.category || normalizeSearchText(creator.category) === normalizeSearchText(filters.category))
+        && (!filters.location || normalizeSearchText(creator.location) === normalizeSearchText(filters.location))
+        && (!filters.rating || creator.rating >= filters.rating)
+    );
+    const sortBy = document.getElementById("creatorSort")?.value || "rating";
+    const sorters = {
+        rating: (a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount,
+        reviews: (a, b) => b.reviewCount - a.reviewCount || b.rating - a.rating,
+        revenue: (a, b) => b.revenue.total - a.revenue.total,
+        monthly: (a, b) => b.revenue.thisMonth - a.revenue.thisMonth,
+        reel: (a, b) => a.pricing.reel - b.pricing.reel,
+        projects: (a, b) => b.projects - a.projects,
+        name: (a, b) => a.name.localeCompare(b.name)
+    };
+    matchingCreators.sort(sorters[sortBy] || sorters.rating);
+
+    const grid = document.querySelector(".creator-grid");
+    if (grid) {
+        const fragment = document.createDocumentFragment();
+        matchingCreators.forEach(creator => {
+            const card = [...grid.children].find(item => item.dataset.creatorId === creator.id);
+            if (card) fragment.append(card);
+        });
+        grid.append(fragment);
+    }
+    const visibleIds = new Set(matchingCreators.map(creator => creator.id));
+    document.querySelectorAll(".creator-card").forEach(card => {
+        const visible = visibleIds.has(card.dataset.creatorId);
+        card.hidden = !visible;
+        card.style.display = visible ? "" : "none";
+    });
+    const visibleCount = matchingCreators.length;
+
+    const activeFilters = terms.length > 0 || filters.skill || filters.category || filters.location || filters.rating;
+    const results = document.getElementById("creatorSearchResults");
+    if (results) {
+        results.textContent = activeFilters
+            ? `${visibleCount} mock creator${visibleCount === 1 ? "" : "s"} found.`
+            : `Showing all ${visibleCount} mock creators.`;
+    }
+
+    const emptyState = document.getElementById("creatorEmptyState");
+    if (emptyState) emptyState.hidden = visibleCount > 0;
+}
+
+function clearCreatorFilters() {
+    const input = document.getElementById("creatorSearch");
+    if (input) input.value = "";
+    ["creatorSkillFilter", "creatorCategoryFilter", "creatorLocationFilter", "creatorRatingFilter"]
+        .forEach(id => {
+            const select = document.getElementById(id);
+            if (select) select.value = "";
+        });
+    const sort = document.getElementById("creatorSort");
+    if (sort) sort.value = "rating";
+    applyCreatorFilters();
+    if (input) input.focus();
+}
+
+function renderCreatorCards() {
+    const grid = document.querySelector(".creator-grid");
+    if (!grid) throw new Error("Creator card container is missing.");
+    grid.replaceChildren(...creators.map(creator => {
+        const card = document.createElement("article");
+        card.className = "creator-card";
+        card.dataset.creatorId = creator.id;
+        const initials = creator.name.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
+        card.innerHTML = `
+            <div class="creator-avatar" aria-hidden="true">${escapeHTML(initials)}</div>
+            <button class="favorite-btn" type="button" aria-label="Favorite ${escapeHTML(creator.name)}" data-creator="${escapeHTML(creator.name)}">♡</button>
+            <h3>${escapeHTML(creator.name)}</h3>
+            <p class="creator-role">${escapeHTML(creator.role)} · ${escapeHTML(creator.location)}</p>
+            <div class="creator-tags">${creator.skills.slice(0, 3).map(skill => `<span>${escapeHTML(skill)}</span>`).join("")}</div>
+            <div class="creator-card-details">
+                <p class="creator-card-bio">${escapeHTML(creator.bio)}</p>
+                <p><strong>Category:</strong> ${escapeHTML(creator.category)}</p>
+                <p><strong>⭐ ${escapeHTML(creator.rating)}</strong> · ${escapeHTML(creator.reviewCount)} mock reviews</p>
+                <p><strong>Mock price:</strong> ${formatCreatorCurrency(creator.pricing.reel)} / reel</p>
+                <div class="creator-card-socials">${renderCreatorSocialLinks(creator.socialLinks)}</div>
+                <span class="creator-demo-indicator">MOCK PROFILE · DEMO DATA</span>
+            </div>
+            <div class="creator-bottom">
+                <span>⭐ ${escapeHTML(creator.rating)} <small>mock rating</small></span>
+                <button type="button" class="creator-view-button">View Profile</button>
+            </div>
+            <div class="creator-card-actions">
+                <button type="button" class="creator-contact-button">Contact</button>
+                <button type="button" class="creator-hire-button">Hire creator</button>
+            </div>
+        `;
+        card.querySelector(".favorite-btn").addEventListener("click", event => favoriteCreator(creator.name, event.currentTarget));
+        card.querySelector(".creator-view-button").addEventListener("click", () => viewCreator(creator.name));
+        card.querySelector(".creator-contact-button").addEventListener("click", event => contactCreator(creator.name, event.currentTarget));
+        card.querySelector(".creator-hire-button").addEventListener("click", () => openBriefForCreator(creator.name));
+        return card;
+    }));
 }
 
 function toggleNitiChat(forceOpen) {
@@ -393,71 +540,140 @@ function viewCreator(name) {
         "profile-popup";
 
 
+    const portfolioHTML = creator.portfolioItems.map((item, index) => {
+        const media = item.mediaUrl
+            ? `<img class="portfolio-image" src="${escapeHTML(item.mediaUrl)}" alt="${escapeHTML(item.title)} — ${escapeHTML(item.description)}" loading="lazy">`
+            : "";
+        const statusClass = item.status === "Completed" ? "completed" : "in-progress";
+        return `
+            <article class="portfolio-item">
+                <div class="portfolio-media portfolio-media--${escapeHTML(item.placeholder)}">
+                    <div class="portfolio-placeholder" aria-label="Sample portfolio placeholder">
+                        <span>${escapeHTML(item.format)} · MOCK SAMPLE ${index + 1}</span>
+                        <strong>${escapeHTML(item.title)}</strong>
+                    </div>
+                    ${media}
+                </div>
+                <div class="portfolio-item-copy">
+                    <h4>${escapeHTML(item.title)}</h4>
+                    <p class="portfolio-meta"><strong>Mock client / brand:</strong> ${escapeHTML(item.client)}</p>
+                    <span class="portfolio-status portfolio-status--${statusClass}">${escapeHTML(item.status)} · mock project</span>
+                    <p>${escapeHTML(item.description)}</p>
+                    <p class="portfolio-meta"><strong>Format:</strong> ${escapeHTML(item.format)}</p>
+                    <p class="portfolio-meta"><strong>Tools:</strong> ${item.toolsUsed.map(escapeHTML).join(", ")}</p>
+                    <p class="portfolio-license">${escapeHTML(item.commercialUse)}</p>
+                </div>
+            </article>
+        `;
+    }).join("");
+
     popup.innerHTML = `
-
-        <div class="profile-box">
-
-            <button
-                class="popup-close"
-                onclick="closeProfile()">
-                ×
-            </button>
-
-            <div class="profile-avatar">
-                ${creator.name.substring(0, 2).toUpperCase()}
+        <div class="profile-box profile-box--rich" role="dialog" aria-modal="true" aria-labelledby="creatorProfileHeading">
+            <button class="popup-close" type="button" onclick="closeProfile()" aria-label="Close creator profile">×</button>
+            <div class="profile-hero">
+                <div class="profile-avatar">${escapeHTML(creator.name.substring(0, 2).toUpperCase())}</div>
+                <div>
+                    <p class="profile-role">${escapeHTML(creator.role)} · ${escapeHTML(creator.location)}</p>
+                    <h2 id="creatorProfileHeading">${escapeHTML(creator.name)}</h2>
+                    <p class="profile-specialization">${escapeHTML(creator.specialization)}</p>
+                </div>
             </div>
-
-            <h2>
-                ${creator.name}
-            </h2>
-
-            <p class="profile-role">
-                ${creator.role}
-            </p>
-
-            <div class="profile-rating">
-                ⭐ ${creator.rating}
+            <p class="profile-bio">${escapeHTML(creator.bio)}</p>
+            <div class="profile-demo-notice">MOCK / DEMO PROFILE: creator details, ratings, reviews, revenue, prices, project history, social handles, and portfolio examples are fictional sample data.</div>
+            <section class="profile-detail profile-social-section">
+                <h3>Mock social profiles <span>Sample links · replace with verified accounts</span></h3>
+                <div class="profile-social-links">${renderCreatorSocialLinks(creator.socialLinks)}</div>
+            </section>
+            <div class="profile-verification" aria-label="Sample verification indicators">
+                <span>Tools · ${creator.verification.tools ? "demo signal" : "not supplied"}</span>
+                <span>Workflow · ${creator.verification.workflow ? "demo signal" : "not supplied"}</span>
+                <span>Past work · ${creator.verification.pastWork ? "demo signal" : "not supplied"}</span>
             </div>
-
             <div class="profile-info">
-
-                <p>
-                    <strong>📍 Location:</strong>
-                    ${creator.location}
-                </p>
-
-                <p>
-                    <strong>🎯 Projects:</strong>
-                    ${creator.projects}
-                </p>
-
-                <p>
-                    <strong>🤖 AI Match:</strong>
-                    ${creator.match}%
-                </p>
-
-                <p>
-                    <strong>🛠 Skills:</strong>
-                    ${creator.skills.join(", ")}
-                </p>
-
+                <span>⭐ ${escapeHTML(creator.rating)} mock rating · ${escapeHTML(creator.reviewCount)} mock reviews</span>
+                <span>🎯 ${escapeHTML(creator.projects)} mock projects</span>
+                <span>🤖 ${escapeHTML(creator.match)}% demo match</span>
             </div>
-
-            <button
-                class="contact-btn"
-                onclick="contactCreator('${creator.name}')">
-
-                Connect with Creator
-
-            </button>
-
+            <div class="profile-detail-grid">
+                <section class="profile-detail">
+                    <h3>Mock project history</h3>
+                    <div class="profile-stat-list">
+                        <p><span>Total projects</span><strong>${escapeHTML(creator.projects)}</strong></p>
+                        <p><span>Completed</span><strong>${escapeHTML(creator.projectStats.completed)}</strong></p>
+                        <p><span>Active</span><strong>${escapeHTML(creator.projectStats.inProgress)}</strong></p>
+                    </div>
+                </section>
+                <section class="profile-detail">
+                    <h3>Mock earnings · INR</h3>
+                    <div class="profile-stat-list">
+                        <p><span>Total revenue</span><strong>${formatCreatorCurrency(creator.revenue.total)}</strong></p>
+                        <p><span>This month</span><strong>${formatCreatorCurrency(creator.revenue.thisMonth)}</strong></p>
+                        <p><span>Completed campaigns</span><strong>${formatCreatorCurrency(creator.revenue.completedCampaigns)}</strong></p>
+                    </div>
+                </section>
+                <section class="profile-detail">
+                    <h3>Mock pricing · INR</h3>
+                    <div class="profile-stat-list">
+                        <p><span>One reel</span><strong>${formatCreatorCurrency(creator.pricing.reel)}</strong></p>
+                        <p><span>Promotional post</span><strong>${formatCreatorCurrency(creator.pricing.promotionalPost)}</strong></p>
+                        <p><span>Story package</span><strong>${formatCreatorCurrency(creator.pricing.storyPackage)}</strong></p>
+                    </div>
+                </section>
+                <section class="profile-detail">
+                    <h3>Skills</h3>
+                    <div class="profile-tags">${creator.skills.map(skill => `<span>${escapeHTML(skill)}</span>`).join("")}</div>
+                </section>
+                <section class="profile-detail">
+                    <h3>AI tools &amp; models</h3>
+                    <div class="profile-tags">${creator.aiTools.map(tool => `<span>${escapeHTML(tool)}</span>`).join("")}</div>
+                </section>
+                <section class="profile-detail">
+                    <h3>Workflow</h3>
+                    <ol class="profile-workflow">${creator.workflowSteps.map(step => `<li>${escapeHTML(step)}</li>`).join("")}</ol>
+                </section>
+                <section class="profile-detail">
+                    <h3>Content types</h3>
+                    <div class="profile-tags">${creator.contentTypes.map(type => `<span>${escapeHTML(type)}</span>`).join("")}</div>
+                </section>
+            </div>
+            <section class="profile-reviews">
+                <div class="profile-section-heading">
+                    <div><h3>Mock customer feedback</h3><p>⭐ ${escapeHTML(creator.rating)} average · ${escapeHTML(creator.reviewCount)} mock reviews</p></div>
+                </div>
+                <div class="profile-review-grid">${creator.reviews.map(review => `
+                    <article class="profile-review">
+                        <p class="profile-review-stars" aria-label="${escapeHTML(review.rating)} out of 5 mock stars">${"★".repeat(review.rating)}${"☆".repeat(5 - review.rating)}</p>
+                        <blockquote>“${escapeHTML(review.text)}”</blockquote>
+                        <p class="profile-review-author">${escapeHTML(review.author)}</p>
+                    </article>
+                `).join("")}</div>
+            </section>
+            <section class="profile-portfolio">
+                <div class="profile-section-heading">
+                    <div><h3>Mock reels &amp; promotions</h3><p>Sample thumbnails, clients, and project statuses.</p></div>
+                </div>
+                <div class="portfolio-grid">${portfolioHTML}</div>
+            </section>
+            <div class="profile-actions">
+                <button class="contact-btn" id="contactCreatorButton" type="button">Contact</button>
+                <button class="brief-secondary-action" id="creatorBriefButton" type="button">Hire creator · create a brief</button>
+                <p class="profile-action-status" id="profileActionStatus" role="status" aria-live="polite"></p>
+            </div>
         </div>
-
     `;
 
-
     document.body.appendChild(popup);
-
+    popup.querySelectorAll(".portfolio-image").forEach(image => {
+        image.addEventListener("error", () => {
+            image.hidden = true;
+        }, { once: true });
+    });
+    popup.querySelector("#contactCreatorButton").addEventListener("click", event => {
+        contactCreator(creator.name, event.currentTarget);
+    });
+    popup.querySelector("#creatorBriefButton").addEventListener("click", () => {
+        openBriefForCreator(creator.name);
+    });
 }
 
 
@@ -477,95 +693,150 @@ function closeProfile() {
    POST A BRIEF
 ========================= */
 
-function showBrief() {
-
-    const oldPopup =
-        document.querySelector(".brief-popup");
-
-    if (oldPopup) {
-        oldPopup.remove();
-    }
-
-
-    const popup =
-        document.createElement("div");
-
-    popup.className =
-        "brief-popup";
-
-
+function showBrief(creatorName = "") {
+    closeBrief();
+    briefCreatorName = creators.some(creator => creator.name === creatorName) ? creatorName : "";
+    const popup = document.createElement("div");
+    popup.className = "brief-popup";
     popup.innerHTML = `
-
-        <div class="brief-box">
-
-            <button
-                class="popup-close"
-                onclick="closeBrief()">
-                ×
-            </button>
-
-            <h2>
-                📝 Post Your Project Brief
-            </h2>
-
-            <input
-                id="briefTitle"
-                type="text"
-                placeholder="Project title">
-
-
-            <textarea
-                id="briefDescription"
-                placeholder="Describe your project...">
-            </textarea>
-
-
-            <select id="briefType">
-
-                <option value="">
-                    Select project type
-                </option>
-
-                <option value="AI Video">
-                    AI Video
-                </option>
-
-                <option value="AI Image">
-                    AI Image
-                </option>
-
-                <option value="AI Ads">
-                    AI Advertisement
-                </option>
-
-                <option value="Social Media">
-                    Social Media
-                </option>
-
-            </select>
-
-
-            <input
-                id="briefBudget"
-                type="number"
-                placeholder="Budget ₹">
-
-
-            <button
-                class="brief-submit"
-                onclick="submitBrief()">
-
-                🤖 Find AI Creators
-
-            </button>
-
+        <div class="brief-box brief-box--builder" role="dialog" aria-modal="true" aria-labelledby="briefHeading">
+            <button class="popup-close" type="button" onclick="closeBrief()" aria-label="Close project brief">×</button>
+            <h2 id="briefHeading">📝 Build Your Creative Brief</h2>
+            <p class="brief-intro">Share the details creators need to scope and deliver your campaign.</p>
+            ${briefCreatorName ? `<p class="brief-creator-context">Creator preference: <strong>${escapeHTML(briefCreatorName)}</strong>. Saving a brief does not confirm availability or an agreement.</p>` : ""}
+            <section class="brief-assistant" aria-labelledby="briefAssistantHeading">
+                <label for="briefRoughIdea" id="briefAssistantHeading">Start with a rough idea</label>
+                <textarea id="briefRoughIdea" rows="3" maxlength="2000" placeholder="Example: Launch a short vertical video campaign for a new sustainable skincare line on Instagram."></textarea>
+                <div class="brief-assistant-actions">
+                    <button class="brief-assist-button" type="button" onclick="assistBriefFromIdea()">✨ Fill brief from idea</button>
+                    <span>Local demo assist — suggestions are not AI-generated. Review and edit every field.</span>
+                </div>
+                <p id="briefAssistStatus" class="brief-assist-status" role="status" aria-live="polite"></p>
+            </section>
+            <form id="creativeBriefForm" onsubmit="submitBrief(event)" novalidate>
+                <div class="brief-form-grid">
+                    <div class="brief-field">
+                        <label for="briefTitle">Campaign / project title <span aria-hidden="true">*</span></label>
+                        <input id="briefTitle" name="title" type="text" maxlength="200" autocomplete="off" required aria-describedby="briefTitleError">
+                        <p class="brief-field-error" id="briefTitleError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefBrand">Brand <span aria-hidden="true">*</span></label>
+                        <input id="briefBrand" name="brand" type="text" maxlength="120" autocomplete="organization" required aria-describedby="briefBrandError">
+                        <p class="brief-field-error" id="briefBrandError"></p>
+                    </div>
+                    <div class="brief-field brief-field--full">
+                        <label for="briefGoal">Campaign goal <span aria-hidden="true">*</span></label>
+                        <input id="briefGoal" name="goal" type="text" maxlength="200" placeholder="e.g. Build awareness for a product launch" required aria-describedby="briefGoalError">
+                        <p class="brief-field-error" id="briefGoalError"></p>
+                    </div>
+                    <div class="brief-field brief-field--full">
+                        <label for="briefDescription">Campaign description <span aria-hidden="true">*</span></label>
+                        <textarea id="briefDescription" name="description" rows="4" maxlength="5000" required aria-describedby="briefDescriptionError"></textarea>
+                        <p class="brief-field-error" id="briefDescriptionError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefType">Content type <span aria-hidden="true">*</span></label>
+                        <select id="briefType" name="type" required aria-describedby="briefTypeError">
+                            <option value="">Choose a content type</option>
+                            <option value="AI Video">AI Video</option>
+                            <option value="AI Image">AI Image</option>
+                            <option value="AI Ads">AI Advertisement</option>
+                            <option value="Social Media">Social Media</option>
+                        </select>
+                        <p class="brief-field-error" id="briefTypeError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefFormat">Aspect ratio / format <span aria-hidden="true">*</span></label>
+                        <select id="briefFormat" name="format" required aria-describedby="briefFormatError">
+                            <option value="">Choose a format</option>
+                            <option>9:16 vertical</option>
+                            <option>4:5 portrait</option>
+                            <option>1:1 square</option>
+                            <option>16:9 landscape</option>
+                            <option>Custom / multiple formats</option>
+                        </select>
+                        <p class="brief-field-error" id="briefFormatError"></p>
+                    </div>
+                    <div class="brief-field brief-field--full">
+                        <label for="briefVisualStyle">Visual style <span aria-hidden="true">*</span></label>
+                        <input id="briefVisualStyle" name="visualStyle" type="text" maxlength="500" placeholder="e.g. Warm natural light, minimal, editorial" required aria-describedby="briefVisualStyleError">
+                        <p class="brief-field-error" id="briefVisualStyleError"></p>
+                    </div>
+                    <div class="brief-field brief-field--full">
+                        <label for="briefVisualReferences">Visual references</label>
+                        <textarea id="briefVisualReferences" name="visualReferences" rows="2" maxlength="2000" placeholder="Links or notes for moodboards, examples, or brand guidelines"></textarea>
+                        <p class="brief-field-hint">Optional. Add public URLs or describe your references.</p>
+                    </div>
+                    <div class="brief-field brief-field--full">
+                        <label for="briefDeliverables">Deliverables <span aria-hidden="true">*</span></label>
+                        <textarea id="briefDeliverables" name="deliverables" rows="2" maxlength="2000" placeholder="Describe the assets, edits, or source files you need" required aria-describedby="briefDeliverablesError"></textarea>
+                        <p class="brief-field-error" id="briefDeliverablesError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefQuantity">Quantity <span aria-hidden="true">*</span></label>
+                        <input id="briefQuantity" name="quantity" type="number" min="1" max="1000" step="1" required aria-describedby="briefQuantityError">
+                        <p class="brief-field-error" id="briefQuantityError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefPlatform">Target platform <span aria-hidden="true">*</span></label>
+                        <input id="briefPlatform" name="targetPlatform" type="text" maxlength="120" placeholder="e.g. Instagram, YouTube, website" required aria-describedby="briefPlatformError">
+                        <p class="brief-field-error" id="briefPlatformError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefRequiredTools">Required AI tools / models</label>
+                        <input id="briefRequiredTools" name="requiredTools" type="text" maxlength="500" placeholder="Optional; separate tools with commas">
+                        <p class="brief-field-hint">Leave blank if creators may recommend tools.</p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefPreferredTools">Preferred AI tools / models</label>
+                        <input id="briefPreferredTools" name="preferredTools" type="text" maxlength="500" placeholder="Optional; separate tools with commas">
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefDeadline">Deadline <span aria-hidden="true">*</span></label>
+                        <input id="briefDeadline" name="deadline" type="date" required aria-describedby="briefDeadlineError">
+                        <p class="brief-field-error" id="briefDeadlineError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefBudget">Budget (₹) <span aria-hidden="true">*</span></label>
+                        <input id="briefBudget" name="budget" type="number" min="1" step="0.01" inputmode="decimal" required aria-describedby="briefBudgetError">
+                        <p class="brief-field-error" id="briefBudgetError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefCommercialUse">Commercial-use requirement <span aria-hidden="true">*</span></label>
+                        <select id="briefCommercialUse" name="commercialUseRequired" required aria-describedby="briefCommercialUseError">
+                            <option value="">Choose a requirement</option>
+                            <option value="required">Commercial use required</option>
+                            <option value="not-required">Commercial use not required</option>
+                        </select>
+                        <p class="brief-field-error" id="briefCommercialUseError"></p>
+                    </div>
+                    <div class="brief-field">
+                        <label for="briefUsageDuration">Usage duration <span aria-hidden="true">*</span></label>
+                        <input id="briefUsageDuration" name="usageDuration" type="text" maxlength="120" placeholder="e.g. 12 months, worldwide" required aria-describedby="briefUsageDurationError">
+                        <p class="brief-field-error" id="briefUsageDurationError"></p>
+                    </div>
+                    <div class="brief-field brief-field--full">
+                        <label for="briefChannels">Intended usage channels <span aria-hidden="true">*</span></label>
+                        <input id="briefChannels" name="intendedChannels" type="text" maxlength="500" placeholder="e.g. Organic social, paid ads, email, website" required aria-describedby="briefChannelsError">
+                        <p class="brief-field-error" id="briefChannelsError"></p>
+                    </div>
+                </div>
+                <p id="briefFormStatus" class="brief-form-status" role="status" aria-live="polite"></p>
+                <button class="brief-submit" id="briefSubmitButton" type="submit">Save brief &amp; find creators</button>
+            </form>
         </div>
-
     `;
-
-
     document.body.appendChild(popup);
-
+    const form = popup.querySelector("#creativeBriefForm");
+    if (form) {
+        form.addEventListener("input", event => applyBriefValidation(event.target.id));
+        form.addEventListener("change", event => applyBriefValidation(event.target.id));
+    }
+    const deadline = popup.querySelector("#briefDeadline");
+    if (deadline) deadline.min = new Date().toISOString().slice(0, 10);
+    const firstField = popup.querySelector("#briefTitle");
+    if (firstField) firstField.focus();
 }
 
 
@@ -577,8 +848,166 @@ function closeBrief() {
     if (popup) {
         popup.remove();
     }
-
 }
+
+function openBriefForCreator(name) {
+    if (!creators.some(creator => creator.name === name)) return;
+    closeProfile();
+    showBrief(name);
+}
+
+    function assistBriefFromIdea() {
+        const ideaInput = document.getElementById("briefRoughIdea");
+        const status = document.getElementById("briefAssistStatus");
+        const idea = ideaInput ? ideaInput.value.trim() : "";
+        if (!idea) {
+            if (status) status.textContent = "Add a short project idea first, then I can draft suggestions.";
+            if (ideaInput) ideaInput.focus();
+            return;
+        }
+
+        const normalizedIdea = normalizeSearchText(idea);
+        const isVideo = /\b(video|reel|film|motion|animation)\b/.test(normalizedIdea);
+        const isImage = /\b(image|photo|photography|still|illustration|artwork)\b/.test(normalizedIdea);
+        const isSocial = /\b(social|instagram|tiktok|reels|youtube|post|carousel)\b/.test(normalizedIdea);
+        const type = isVideo ? "AI Video" : isImage ? "AI Image" : isSocial ? "Social Media" : "AI Ads";
+        const platform = /\b(tiktok)\b/.test(normalizedIdea) ? "TikTok"
+            : /\b(youtube)\b/.test(normalizedIdea) ? "YouTube"
+                : /\b(instagram|reels)\b/.test(normalizedIdea) ? "Instagram"
+                    : /\b(website|web)\b/.test(normalizedIdea) ? "Website" : "Instagram and paid social";
+        const format = type === "AI Video" || platform === "TikTok" || platform === "Instagram"
+            ? "9:16 vertical"
+            : type === "AI Image" ? "4:5 portrait"
+                : type === "Social Media" ? "4:5 portrait" : "16:9 landscape";
+        const toolMatches = creators
+            .filter(creator => creator.role.toLowerCase().includes(type === "AI Video" ? "video" : type === "AI Image" ? "image" : type === "AI Ads" ? "advertisement" : "content"))
+            .flatMap(creator => creator.aiTools)
+            .slice(0, 2);
+        const sentence = idea.split(/[.!?]/)[0].trim();
+        const title = sentence.length > 70 ? `${sentence.slice(0, 67).trim()}...` : sentence;
+        const quantityMatch = idea.match(/\b(\d{1,3})\s*(?:videos?|images?|posts?|assets?|reels?|deliverables?)\b/i);
+        const quantity = quantityMatch ? quantityMatch[1] : type === "Social Media" ? "3" : "1";
+        const referenceLinks = idea.match(/https?:\/\/\S+/g) || [];
+        const values = {
+            briefTitle: title,
+            briefGoal: /\b(launch|new product|introduc)\b/.test(normalizedIdea) ? "Build awareness for a product launch" : "Create engaging campaign content for the target audience",
+            briefDescription: idea,
+            briefType: type,
+            briefFormat: format,
+            briefVisualStyle: /\b(minimal|cinematic|playful|luxury|editorial|vibrant|natural)\b/i.test(idea)
+                ? `Use a ${idea.match(/\b(minimal|cinematic|playful|luxury|editorial|vibrant|natural)\b/i)[0]} visual direction`
+                : "Polished, contemporary visual direction aligned to the brand",
+            briefVisualReferences: referenceLinks.join("\n"),
+            briefDeliverables: type === "AI Video" ? "Finished campaign video, caption-ready export, and one revision"
+                : type === "AI Image" ? "Final campaign images, web-ready exports, and one revision"
+                    : type === "Social Media" ? "Platform-ready social assets, caption suggestions, and one revision"
+                        : "Campaign ad creative, platform-ready exports, and one revision",
+            briefQuantity: quantity,
+            briefPlatform: platform,
+            briefPreferredTools: toolMatches.join(", "),
+            briefUsageDuration: "12 months; confirm geographic scope with the creator",
+            briefCommercialUse: "required",
+            briefChannels: platform === "Instagram" ? "Organic Instagram and paid social"
+                : platform === "TikTok" ? "Organic TikTok and paid social"
+                    : platform === "YouTube" ? "YouTube organic and paid placements"
+                        : "Organic social, paid ads, and brand website"
+        };
+
+        Object.entries(values).forEach(([id, value]) => {
+            const field = document.getElementById(id);
+            if (field && !field.value.trim()) {
+                field.value = value;
+                const error = document.getElementById(`${id}Error`);
+                if (error) error.textContent = "";
+                field.setAttribute("aria-invalid", "false");
+            }
+        });
+        if (status) status.textContent = "Demo suggestions added. No AI service was used; review and edit all details, especially brand, deadline, and budget.";
+    }
+
+    function getBriefPayload() {
+        const value = id => document.getElementById(id).value.trim();
+        return {
+            title: value("briefTitle"),
+            brand: value("briefBrand"),
+            goal: value("briefGoal"),
+            description: value("briefDescription"),
+            type: value("briefType"),
+            visualStyle: value("briefVisualStyle"),
+            visualReferences: value("briefVisualReferences"),
+            deliverables: value("briefDeliverables"),
+            quantity: Number(value("briefQuantity")),
+            format: value("briefFormat"),
+            targetPlatform: value("briefPlatform"),
+            requiredTools: value("briefRequiredTools"),
+            preferredTools: value("briefPreferredTools"),
+            deadline: value("briefDeadline"),
+            budget: Number(value("briefBudget")),
+            commercialUseRequired: value("briefCommercialUse") === "required",
+            usageDuration: value("briefUsageDuration"),
+            intendedChannels: value("briefChannels"),
+            ...(briefCreatorName ? { selectedCreatorName: briefCreatorName } : {})
+        };
+    }
+
+    function applyBriefValidation(fieldId) {
+        const brief = getBriefPayload();
+        const errors = {
+            briefTitle: brief.title ? "" : "Enter a campaign or project title.",
+            briefBrand: brief.brand ? "" : "Enter the brand name.",
+            briefGoal: brief.goal ? "" : "Describe the campaign goal.",
+            briefDescription: brief.description ? "" : "Describe the campaign and its audience.",
+            briefType: brief.type ? "" : "Choose a content type.",
+            briefVisualStyle: brief.visualStyle ? "" : "Describe the visual style.",
+            briefDeliverables: brief.deliverables ? "" : "List the expected deliverables.",
+            briefQuantity: Number.isInteger(brief.quantity) && brief.quantity > 0 && brief.quantity <= 1000 ? "" : "Enter a whole-number quantity between 1 and 1,000.",
+            briefFormat: brief.format ? "" : "Choose an aspect ratio or format.",
+            briefPlatform: brief.targetPlatform ? "" : "Enter at least one target platform.",
+            briefDeadline: brief.deadline && brief.deadline >= new Date().toISOString().slice(0, 10) ? "" : "Choose today or a future deadline.",
+            briefBudget: Number.isFinite(brief.budget) && brief.budget > 0 ? "" : "Enter a budget greater than zero.",
+            briefCommercialUse: document.getElementById("briefCommercialUse").value ? "" : "Choose whether commercial use is required.",
+            briefUsageDuration: brief.usageDuration ? "" : "Enter how long the content may be used.",
+            briefChannels: brief.intendedChannels ? "" : "Enter the intended usage channels."
+        };
+        let valid = true;
+        Object.entries(errors).forEach(([id, message]) => {
+            if (message) valid = false;
+            if (fieldId && fieldId !== id) return;
+            const field = document.getElementById(id);
+            const error = document.getElementById(`${id}Error`);
+            if (!field || !error) return;
+            error.textContent = message;
+            field.setAttribute("aria-invalid", String(Boolean(message)));
+        });
+        return { valid, brief };
+    }
+
+    function showBriefSuccess(brief) {
+        const box = document.querySelector(".brief-box");
+        if (!box) return;
+        box.classList.add("brief-box--success");
+        box.innerHTML = `
+            <button class="popup-close" type="button" onclick="closeBrief()" aria-label="Close success message">×</button>
+            <div class="brief-success-icon" aria-hidden="true">✓</div>
+            <h2 id="briefHeading">Brief saved to your account</h2>
+            <p class="brief-success-copy"><strong>${escapeHTML(brief.title)}</strong> for ${escapeHTML(brief.brand)} has been saved${brief.selectedCreatorName ? ` with ${escapeHTML(brief.selectedCreatorName)} as your creator preference` : ""}.</p>
+            <p class="brief-success-note">Saving does not send an offer or confirm creator availability, acceptance, or a transaction. Creator suggestions use demo match scores only.</p>
+            ${brief.selectedCreatorName ? `<button class="brief-submit" id="briefSelectedCreatorButton" type="button">Review ${escapeHTML(brief.selectedCreatorName)}'s profile</button>` : ""}
+            <button class="brief-secondary-action" id="briefSuggestionsButton" type="button">See demo creator suggestions</button>
+            <button class="brief-secondary-action" type="button" onclick="closeBrief()">Done</button>
+        `;
+        const selectedCreatorButton = box.querySelector("#briefSelectedCreatorButton");
+        if (selectedCreatorButton) {
+            selectedCreatorButton.addEventListener("click", () => {
+                closeBrief();
+                viewCreator(brief.selectedCreatorName);
+            });
+        }
+        box.querySelector("#briefSuggestionsButton").addEventListener("click", () => {
+            closeBrief();
+            showAIResult(brief.title, brief.type, brief.budget);
+        });
+    }
 
 
 /* =========================
@@ -784,6 +1213,8 @@ window.addEventListener(
         const progress =
             document.getElementById("matchProgress");
 
+        loadCreatorData();
+
         if (progress) {
 
             setTimeout(() => {
@@ -873,6 +1304,7 @@ function closeLogin() {
 // Firebase Authentication identifies users; the backend stores their app data in MongoDB.
 let authMode = "login";
 let currentNitiUser = null;
+let briefCreatorName = "";
 
 async function mongoApi(path, options = {}) {
     if (!currentNitiUser) {
@@ -1044,33 +1476,62 @@ async function favoriteCreator(name, button) {
     }
 }
 
-async function contactCreator(name) {
+async function contactCreator(name, button) {
+    const status = document.getElementById("profileActionStatus");
     if (!currentNitiUser) {
         closeProfile();
         showNotification("Login required", "Please log in to contact a creator.");
         openLogin();
         return;
     }
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Saving request…";
+    }
+    if (status) status.textContent = "Saving your engagement request…";
     try {
         await mongoApi("/api/contact-requests", {
             method: "POST",
             body: JSON.stringify({ creatorName: name })
         });
-        closeProfile();
-        showNotification("Connection request sent", "Your request to " + name + " has been sent.");
+        const box = document.querySelector(".profile-box");
+        if (box) {
+            box.classList.add("profile-box--confirmation");
+            box.innerHTML = `
+                <button class="popup-close" type="button" onclick="closeProfile()" aria-label="Close confirmation">×</button>
+                <div class="brief-success-icon" aria-hidden="true">✓</div>
+                <h2 id="creatorRequestHeading" tabindex="-1">Engagement request saved</h2>
+                <p class="brief-success-copy">Your request about <strong>${escapeHTML(name)}</strong> has been recorded in your account.</p>
+                <p class="brief-success-note">This demo does not confirm that the creator received or accepted the request, or that a transaction took place.</p>
+                <button class="contact-btn" id="requestBriefButton" type="button">Create a brief with ${escapeHTML(name)}</button>
+                <button class="brief-secondary-action" type="button" onclick="closeProfile()">Done</button>
+            `;
+            box.setAttribute("aria-labelledby", "creatorRequestHeading");
+            box.querySelector("#requestBriefButton").addEventListener("click", () => openBriefForCreator(name));
+            box.querySelector("h2").focus();
+        } else {
+            showNotification("Engagement request saved", `Your request about ${name} is recorded in your account; creator receipt or acceptance is not confirmed.`);
+        }
     } catch (error) {
         console.error("Could not send contact request:", error.message);
-        showNotification("Could not send request", error.message);
+        const currentStatus = document.getElementById("profileActionStatus");
+        if (currentStatus) currentStatus.textContent = `Could not save request: ${error.message}`;
+        else showNotification("Could not save request", error.message);
+        if (button) {
+            button.disabled = false;
+            button.textContent = "Request an engagement";
+        }
     }
 }
 
-async function submitBrief() {
-    const title = document.getElementById("briefTitle").value.trim();
-    const description = document.getElementById("briefDescription").value.trim();
-    const type = document.getElementById("briefType").value;
-    const budget = Number(document.getElementById("briefBudget").value);
-    if (!title || !description || !type || !Number.isFinite(budget) || budget <= 0) {
-        showNotification("Missing information", "Enter all project details and a budget above zero.");
+async function submitBrief(event) {
+    if (event) event.preventDefault();
+    const { valid, brief } = applyBriefValidation();
+    const status = document.getElementById("briefFormStatus");
+    if (!valid) {
+        const firstInvalid = document.querySelector(".brief-box [aria-invalid='true']");
+        if (firstInvalid) firstInvalid.focus();
+        if (status) status.textContent = "Please fix the highlighted fields before saving.";
         return;
     }
     if (!currentNitiUser) {
@@ -1079,17 +1540,28 @@ async function submitBrief() {
         openLogin();
         return;
     }
+    const submitButton = document.getElementById("briefSubmitButton");
+    const form = document.getElementById("creativeBriefForm");
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Saving brief…";
+    }
+    if (form) form.setAttribute("aria-busy", "true");
+    if (status) status.textContent = "Saving your structured brief...";
     try {
         await mongoApi("/api/briefs", {
             method: "POST",
-            body: JSON.stringify({ title, description, type, budget })
+            body: JSON.stringify(brief)
         });
-        closeBrief();
-        showAIResult(title, type, budget);
-        showNotification("Brief saved", "Your project brief was saved to NITI AI.");
+        showBriefSuccess(brief);
     } catch (error) {
         console.error("Could not save brief:", error.message);
-        showNotification("Could not save brief", error.message);
+        if (status) status.textContent = `Could not save brief: ${error.message}`;
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = "Save brief & find creators";
+        }
+        if (form) form.setAttribute("aria-busy", "false");
     }
 }
 

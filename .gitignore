@@ -12,6 +12,7 @@ logs/
 *.tgz
 coverage/
 .nyc_output/
+public/data/creators.csv
 
 # Firebase deployment config can contain project-specific settings
 # .firebaserc

@@ -21,10 +21,19 @@ const app = express();
 const staticFiles = new Map([
     ["/script.js", "script.js"],
     ["/style.css", "style.css"],
-    ["/firebase-config.js", "firebase-config.js"]
+    ["/firebase-config.js", "firebase-config.js"],
+    ["/creator-data.js", "public/creator-data.js"],
+    ["/data/creators.csv", "data/creators.csv"]
 ]);
 const port = Number(process.env.PORT || 5500);
 const allowedProjectTypes = new Set(["AI Video", "AI Image", "AI Ads", "Social Media"]);
+function validDeadline(value) {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime())
+        && parsed.toISOString().slice(0, 10) === value
+        && value >= new Date().toISOString().slice(0, 10);
+}
 let database;
 const aiRequestCounts = new Map();
 
@@ -120,19 +129,50 @@ app.post("/api/contact-requests", requireFirebaseUser, async (req, res, next) =>
 });
 
 app.post("/api/briefs", requireFirebaseUser, async (req, res, next) => {
-    const { title, description, type, budget } = req.body || {};
-    if (!validString(title, 200) || !validString(description, 5000) ||
-        !allowedProjectTypes.has(type) || !Number.isFinite(budget) || budget <= 0) {
-        res.status(400).json({ error: "Enter a valid title, description, project type, and positive budget." });
+    const {
+        title, brand, goal, description, type, visualStyle, visualReferences,
+        deliverables, quantity, format, targetPlatform, requiredTools,
+        preferredTools, deadline, budget, commercialUseRequired,
+        usageDuration, intendedChannels, selectedCreatorName
+    } = req.body || {};
+    if (!validString(title, 200) || !validString(brand, 120) ||
+        !validString(goal, 200) || !validString(description, 5000) ||
+        !allowedProjectTypes.has(type) || !validString(visualStyle, 500) ||
+        typeof visualReferences !== "string" || visualReferences.length > 2000 ||
+        !validString(deliverables, 2000) || !Number.isInteger(quantity) ||
+        quantity < 1 || quantity > 1000 || !validString(format, 80) ||
+        !validString(targetPlatform, 120) ||
+        typeof requiredTools !== "string" || requiredTools.length > 500 ||
+        typeof preferredTools !== "string" || preferredTools.length > 500 ||
+        !validDeadline(deadline) || !Number.isFinite(budget) || budget <= 0 ||
+        typeof commercialUseRequired !== "boolean" ||
+        !validString(usageDuration, 120) || !validString(intendedChannels, 500) ||
+        (selectedCreatorName !== undefined && !validString(selectedCreatorName, 120))) {
+        res.status(400).json({ error: "Complete the required brief fields with valid values and limits." });
         return;
     }
 
     try {
         const result = await req.db.collection("briefs").insertOne({
             title: title.trim(),
+            brand: brand.trim(),
+            goal: goal.trim(),
             description: description.trim(),
             type,
+            visualStyle: visualStyle.trim(),
+            visualReferences: visualReferences.trim(),
+            deliverables: deliverables.trim(),
+            quantity,
+            format: format.trim(),
+            targetPlatform: targetPlatform.trim(),
+            requiredTools: requiredTools.trim(),
+            preferredTools: preferredTools.trim(),
+            deadline,
             budget,
+            commercialUseRequired,
+            usageDuration: usageDuration.trim(),
+            intendedChannels: intendedChannels.trim(),
+            ...(selectedCreatorName ? { selectedCreatorName: selectedCreatorName.trim() } : {}),
             userId: req.user.uid,
             createdAt: new Date()
         });
