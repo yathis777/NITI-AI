@@ -12,8 +12,11 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig, "niti-ai-assistant");
-// Add the reCAPTCHA Enterprise site key from Firebase App Check before enabling enforcement.
 const appCheckSiteKey = "6LdvteMtAAAAAIkvbYMLIaXXpNCC4SXUDQM075XU";
+const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+if (isLocalhost) {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
 if (appCheckSiteKey) {
     initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
 }
@@ -138,11 +141,19 @@ form.addEventListener("submit", async event => {
     } catch (error) {
         console.error("NITI AI chat error:", error);
         const code = String(error?.code || error?.status || error?.name || "unknown");
-        const detail = String(error?.message || "").replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]").replace(/\s+/g, " ").slice(0, 280);
+        const errorMessage = String(error?.message || "");
+        const detail = errorMessage.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]").replace(/\s+/g, " ").slice(0, 280);
         const reason = detail ? `${code}: ${detail}` : code;
-        pending.textContent = replyLanguage === "Telugu"
-            ? `AI అభ్యర్థన విఫలమైంది. కారణం: ${reason}`
-            : `The AI request failed. Details: ${reason}`;
+        const appCheckRejected = /app.?check.*(?:token.*invalid|invalid.*token)|token is invalid/i.test(errorMessage);
+        if (appCheckRejected) {
+            pending.textContent = replyLanguage === "Telugu"
+                ? "Firebase App Check ఈ అభ్యర్థనను తిరస్కరించింది. Localhostలో browser consoleలో కనిపించే debug token‌ను Firebase Console → Security → App Check → Appsలో ఈ web appకు register చేసి మళ్లీ ప్రయత్నించండి. Live siteలో App Check provider, site key, domain సరిగ్గా సరిపోతున్నాయో చూడండి."
+                : "Firebase App Check rejected this request. On localhost, register the debug token shown in the browser console under Firebase Console → Security → App Check → Apps for this web app, then retry. On the live site, verify the App Check provider, site key, and allowed domain.";
+        } else {
+            pending.textContent = replyLanguage === "Telugu"
+                ? `AI అభ్యర్థన విఫలమైంది. కారణం: ${reason}`
+                : `The AI request failed. Details: ${reason}`;
+        }
         pending.classList.remove("pending");
     } finally {
         sendButton.disabled = false;
