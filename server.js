@@ -29,6 +29,8 @@ const staticFiles = new Map([
     ["/admin.js", "admin.js"],
     ["/admin.css", "admin.css"],
     ["/firebase-config.js", "firebase-config.js"],
+    ["/ai-config.js", "public/ai-config.js"],
+    ["/join-app-check.js", "public/join-app-check.js"],
     ["/creator-data.js", "public/creator-data.js"],
     ["/data/creators.csv", "data/creators.csv"]
 ]);

@@ -70,13 +70,13 @@
         </nav>
 
 
-        <button
-            class="login-btn"
-            onclick="openLogin()">
-
-            Login
-
-        </button>
+        <div class="nav-actions">
+            <button
+                class="login-btn"
+                onclick="openLogin()">
+                Login
+            </button>
+        </div>
 
     </header>
 
@@ -694,7 +694,6 @@
                 🐬
             </div>
 
-
             <h2>
                 Welcome to NITI AI
             </h2>
@@ -713,6 +712,10 @@
 
 
             <label class="sr-only" for="password">Password</label>
+            <div class="auth-password-label">
+                <span aria-hidden="true">Password</span>
+                <button class="auth-forgot" id="forgotPasswordButton" type="button" onclick="forgotPassword()">Forgot password?</button>
+            </div>
             <input
                 type="password"
                 id="password"
@@ -743,6 +746,23 @@
 
         </div>
 
+    </div>
+
+    <div id="joinVerificationModal" class="join-verification-modal" aria-hidden="true">
+        <section class="join-verification-card" role="dialog" aria-modal="true" aria-labelledby="joinVerificationTitle">
+            <button class="join-verification-close" type="button" onclick="closeJoinVerification()" aria-label="Close invite verification">×</button>
+            <div class="join-verification-mark" aria-hidden="true">✦</div>
+            <p class="join-verification-kicker">A CREATIVE COMMUNITY</p>
+            <h2 id="joinVerificationTitle">Join NITI AI</h2>
+            <p class="join-verification-copy">Enter your invite password to continue to account creation.</p>
+            <form id="joinVerificationForm" class="join-verification-form" onsubmit="verifyJoinPassword(event)">
+                <label for="joinInvitePassword">Invite password</label>
+                <input id="joinInvitePassword" name="invitePassword" type="password" autocomplete="off" required maxlength="128" aria-describedby="joinVerificationMessage">
+                <button id="joinVerificationSubmit" type="submit"><span>Verify &amp; continue</span><span aria-hidden="true">→</span></button>
+                <p id="joinVerificationMessage" class="join-verification-message" role="status" aria-live="polite"></p>
+            </form>
+            <p class="join-verification-note">Your invite password is checked securely by NITI AI.</p>
+        </section>
     </div>
 
 
@@ -785,7 +805,9 @@
     <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="creator-data.js"></script>
+    <script src="ai-config.js"></script>
     <script src="script.js"></script>
+    <script type="module" src="join-app-check.js"></script>
 
 </body>
 </html>

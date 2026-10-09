@@ -13,6 +13,8 @@ Use Node.js 22 or newer.
 
 The website keeps Firebase Authentication for account sign-in. MongoDB stores the app's project data; connecting Compass alone does not transfer existing Firestore data.
 
+On the sign-in screen, **Forgot password?** sends a Firebase Authentication password-reset email to the entered address. Open the email link to choose a new account password. Configure the Firebase Authentication email template and authorized domains in Firebase Console.
+
 ## Secure admin dashboard
 
 The free Firebase Hosting dashboard at `/admin` reads contact requests and project briefs directly from Firestore. Firestore security rules allow normal signed-in users to read only their own records; a Firebase Auth custom claim (`admin: true`) grants read-only access to these two collections for the configured administrator. New saves include the signed-in customer's email, which the rules validate against their Firebase Auth token; older records without an email still show their Firebase UID. No service-account key or database credential is included in browser code.
@@ -56,6 +58,25 @@ Edit only `data/creators.csv`. Run `npm.cmd run prepare:hosting-data` to generat
 3. Restart with `npm.cmd start`, sign into NITI AI, open the chat, and explicitly enable **AI search** before asking a question. Answers are generated server-side and may include web citations.
 
 AI chat is disabled until a key is configured and the user opts in. Chat messages are sent to the configured AI provider only after opt-in and are not saved by this app. The medical-report helper remains browser-only and does not send its step-by-step answers to the AI provider. Do not submit sensitive personal or medical information to AI chat. Provider usage may incur charges.
+
+## Join NITI AI invite verification
+
+The Join button checks an invite password through the Cloudflare Worker before opening the existing Firebase sign-up form. The password is stored as a Cloudflare Worker secret, never in browser code or this repository.
+
+From the `cloudflare` directory, configure and deploy the Worker:
+
+```powershell
+npx wrangler secret put JOIN_PASSWORD
+npx wrangler deploy
+```
+
+Wrangler prompts for the value without putting it in the command history. Choose a long, unique invite password and share it only with intended invitees. If deploying a new Worker environment, verify its configured Firebase App Check values and allowed production origins as well. Deploy Firebase Hosting after the Worker is available so the Join interface is live:
+
+```powershell
+firebase deploy --only hosting --project niti-ai-2ba5d
+```
+
+The invite check protects the website's sign-up flow; Firebase's public client sign-up API can still be called independently. Do not treat this UI gate as a hard restriction on Firebase account creation. Enforcing that would require a supported server-side Firebase Auth blocking function or a backend-mediated account-creation design.
 
 ## Run with Docker
 

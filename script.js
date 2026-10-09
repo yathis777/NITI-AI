@@ -1337,11 +1337,13 @@ function openLogin() {
     const subtitle = document.querySelector(".login-box > p");
     const submit = document.getElementById("loginSubmit");
     const toggle = document.getElementById("authModeToggle");
+    const forgot = document.getElementById("forgotPasswordButton");
     const message = document.getElementById("loginMessage");
     if (heading) heading.textContent = "Welcome to NITI AI";
     if (subtitle) subtitle.textContent = "Login to connect with AI creators";
     if (submit) submit.textContent = "Login";
     if (toggle) toggle.textContent = "New here? Create an account";
+    if (forgot) forgot.hidden = false;
     if (message) message.textContent = "";
 
     modal.classList.add("show");
@@ -1352,6 +1354,92 @@ function openLogin() {
 function closeLogin() {
     const modal = document.getElementById("loginModal");
     if (modal) modal.classList.remove("show");
+    joinVerificationPassed = false;
+}
+
+let joinVerificationPassed = false;
+let joinVerificationReturnFocus = null;
+
+function openJoinVerification() {
+    const modal = document.getElementById("joinVerificationModal");
+    const form = document.getElementById("joinVerificationForm");
+    const password = document.getElementById("joinInvitePassword");
+    const message = document.getElementById("joinVerificationMessage");
+    const submit = document.getElementById("joinVerificationSubmit");
+    if (!modal || !form || !password || !message || !submit) return;
+
+    joinVerificationReturnFocus = document.activeElement;
+    form.reset();
+    message.textContent = "";
+    message.dataset.kind = "";
+    submit.disabled = false;
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("join-verification-open");
+    setTimeout(() => password.focus(), 100);
+}
+
+function closeJoinVerification() {
+    const modal = document.getElementById("joinVerificationModal");
+    if (!modal || !modal.classList.contains("show")) return;
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("join-verification-open");
+    if (joinVerificationReturnFocus && typeof joinVerificationReturnFocus.focus === "function") {
+        joinVerificationReturnFocus.focus();
+    }
+}
+
+async function verifyJoinPassword(event) {
+    event.preventDefault();
+    const password = document.getElementById("joinInvitePassword");
+    const message = document.getElementById("joinVerificationMessage");
+    const submit = document.getElementById("joinVerificationSubmit");
+    if (!password || !message || !submit) return;
+
+    const workerUrl = window.NITI_AI_CHAT_WORKER_URL;
+    if (typeof workerUrl !== "string" ||
+        !/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)?\.workers\.dev$/i.test(workerUrl) ||
+        typeof window.nitiGetAppCheckToken !== "function") {
+        message.textContent = "Secure join verification is unavailable. Please try again later.";
+        message.dataset.kind = "error";
+        return;
+    }
+
+    submit.disabled = true;
+    submit.querySelector("span").textContent = "Checking invite…";
+    message.textContent = "Verifying your invite securely…";
+    message.dataset.kind = "info";
+    try {
+        const token = await window.nitiGetAppCheckToken();
+        const response = await fetch(`${workerUrl}/api/join/verify`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Firebase-AppCheck": token
+            },
+            body: JSON.stringify({ password: password.value })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            message.textContent = result.error || "The invite password could not be verified.";
+            message.dataset.kind = "error";
+            return;
+        }
+        if (result.verified !== true) throw new Error("The verification service returned an invalid response.");
+
+        closeJoinVerification();
+        openLogin();
+        joinVerificationPassed = true;
+        toggleAuthMode();
+    } catch (error) {
+        console.error("Could not verify the NITI AI invite:", error.message);
+        message.textContent = "Could not verify your invite. Check your connection and try again.";
+        message.dataset.kind = "error";
+    } finally {
+        submit.disabled = false;
+        submit.querySelector("span").textContent = "Verify & continue";
+    }
 }
 // Firebase Authentication identifies users; the backend stores their app data in MongoDB.
 let authMode = "login";
@@ -1385,17 +1473,80 @@ async function mongoApi(path, options = {}) {
 }
 
 function toggleAuthMode() {
-    authMode = authMode === "login" ? "signup" : "login";
+    const requestedMode = authMode === "login" ? "signup" : "login";
+    if (requestedMode === "signup" && !joinVerificationPassed) {
+        openJoinVerification();
+        return;
+    }
+    authMode = requestedMode;
+    if (authMode === "login") joinVerificationPassed = false;
     const heading = document.querySelector(".login-box h2");
     const subtitle = document.querySelector(".login-box > p");
     const submit = document.getElementById("loginSubmit");
     const toggle = document.getElementById("authModeToggle");
+    const forgot = document.getElementById("forgotPasswordButton");
     const message = document.getElementById("loginMessage");
     if (heading) heading.textContent = authMode === "signup" ? "Create your NITI AI account" : "Welcome to NITI AI";
     if (subtitle) subtitle.textContent = authMode === "signup" ? "Sign up to connect with AI creators" : "Login to connect with AI creators";
     if (submit) submit.textContent = authMode === "signup" ? "Create account" : "Login";
     if (toggle) toggle.textContent = authMode === "signup" ? "Already have an account? Login" : "New here? Create an account";
+    if (forgot) forgot.hidden = authMode === "signup";
     if (message) message.textContent = "";
+}
+
+async function forgotPassword() {
+    const emailInput = document.getElementById("email");
+    const button = document.getElementById("forgotPasswordButton");
+    if (!emailInput || !button) return;
+
+    const email = emailInput.value.trim();
+    if (!email) {
+        const message = document.getElementById("loginMessage");
+        if (message) {
+            message.textContent = "Enter your email address first; we’ll send a password reset link.";
+            message.style.color = "#ff6b6b";
+        }
+        emailInput.focus();
+        return;
+    }
+    if (!emailInput.validity.valid) {
+        const message = document.getElementById("loginMessage");
+        if (message) {
+            message.textContent = "Please enter a valid email address.";
+            message.style.color = "#ff6b6b";
+        }
+        emailInput.focus();
+        return;
+    }
+    if (!window.nitiAuth) {
+        const message = document.getElementById("loginMessage");
+        if (message) {
+            message.textContent = "Firebase authentication is unavailable. Please try again later.";
+            message.style.color = "#ff6b6b";
+        }
+        return;
+    }
+
+    const message = document.getElementById("loginMessage");
+    button.disabled = true;
+    if (message) {
+        message.textContent = "Sending password reset email…";
+        message.style.color = "#94a3b8";
+    }
+    try {
+        await window.nitiAuth.sendPasswordResetEmail(email);
+        if (message) {
+            message.textContent = "If an account exists for that email, a reset link is on its way. Open it to create a new password.";
+            message.style.color = "#00e676";
+        }
+    } catch (error) {
+        if (message) {
+            message.textContent = authErrorMessage(error);
+            message.style.color = "#ff6b6b";
+        }
+    } finally {
+        button.disabled = false;
+    }
 }
 
 function syncAuthUI(user) {
@@ -1433,6 +1584,10 @@ function authErrorMessage(error) {
     const messages = {
         "auth/email-already-in-use": "This email already has an account. Please log in.",
         "auth/invalid-email": "Please enter a valid email address.",
+        "auth/too-many-requests": "Too many attempts. Please wait and try again.",
+        "auth/network-request-failed": "Network error. Check your internet connection and retry.",
+        "auth/operation-not-allowed": "Email and password sign-in is not enabled in Firebase.",
+        "auth/unauthorized-domain": "This website domain is not allowed in Firebase Authentication settings.",
         "auth/invalid-credential": "Email or password is incorrect.",
         "auth/user-not-found": "No account found for this email. Create an account first.",
         "auth/wrong-password": "Email or password is incorrect.",
@@ -1447,6 +1602,10 @@ function authErrorMessage(error) {
 }
 
 async function login() {
+    if (authMode === "signup" && !joinVerificationPassed) {
+        openJoinVerification();
+        return;
+    }
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
     const message = document.getElementById("loginMessage");
@@ -1477,6 +1636,7 @@ async function login() {
     try {
         if (authMode === "signup") {
             await window.nitiAuth.createUserWithEmailAndPassword(email, password);
+            joinVerificationPassed = false;
         } else {
             await window.nitiAuth.signInWithEmailAndPassword(email, password);
         }
@@ -1493,6 +1653,14 @@ async function login() {
         if (submit) submit.disabled = false;
     }
 }
+
+document.getElementById("joinVerificationModal")?.addEventListener("click", event => {
+    if (event.target.id === "joinVerificationModal") closeJoinVerification();
+});
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeJoinVerification();
+});
 
 async function logout() {
     try {

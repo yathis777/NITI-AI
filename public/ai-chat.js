@@ -1,25 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyDg3bgUlfIzxBPCjUM5PVTkaO-jaXmUhDI",
-    authDomain: "niti-ai-2ba5d.firebaseapp.com",
-    projectId: "niti-ai-2ba5d",
-    storageBucket: "niti-ai-2ba5d.firebasestorage.app",
-    messagingSenderId: "620811813898",
-    appId: "1:620811813898:web:2defe24fefa8796e97cbf3"
-};
-
-const app = initializeApp(firebaseConfig, "niti-ai-assistant");
-const appCheckSiteKey = "6LdvteMtAAAAAIkvbYMLIaXXpNCC4SXUDQM075XU";
-const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
-if (isLocalhost) {
-    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-}
-const appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
-    isTokenAutoRefreshEnabled: true
-});
+import { getNitiAppCheckToken } from "./join-app-check.js";
 const panel = document.getElementById("nitiChat");
 const launcher = document.getElementById("nitiChatLauncher");
 const closeButton = document.getElementById("nitiChatClose");
@@ -155,7 +134,7 @@ async function getInstantReply(question, language) {
 
 async function getAiAnswer(prompt) {
     const workerUrl = getWorkerUrl();
-    const { token } = await getToken(appCheck, false);
+    const token = await getNitiAppCheckToken();
     const response = await fetch(`${workerUrl}/api/chat`, {
         method: "POST",
         headers: {
@@ -233,7 +212,7 @@ imageForm.addEventListener("submit", async event => {
     imageStatus.textContent = "Creating your image… this may take a little while.";
     imageStatus.dataset.kind = "info";
     try {
-        const { token } = await getToken(appCheck, false);
+        const token = await getNitiAppCheckToken();
         const response = await fetch(`${getWorkerUrl()}/api/image`, {
             method: "POST",
             headers: {

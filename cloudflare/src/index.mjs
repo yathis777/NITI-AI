@@ -4,6 +4,9 @@ const MAX_BODY_BYTES = 32 * 1024;
 const MAX_MESSAGES = 12;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_IMAGE_PROMPT_LENGTH = 2048;
+const MAX_JOIN_PASSWORD_LENGTH = 128;
+const JOIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const MAX_JOIN_ATTEMPTS = 5;
 const SYSTEM_INSTRUCTION = [
     "You are the helpful NITI AI assistant. Answer naturally and in the same language as the user, including Telugu written in Latin letters.",
     "Help with creator discovery, project briefs, and writing creative prompts.",
@@ -15,6 +18,7 @@ const SYSTEM_INSTRUCTION = [
 
 let cachedJwks;
 let cachedJwksUntil = 0;
+const joinAttempts = new Map();
 
 function jsonResponse(data, status, corsHeaders) {
     return new Response(JSON.stringify(data), {
@@ -121,6 +125,42 @@ function validateMessages(messages) {
         messages[messages.length - 1].role === "user";
 }
 
+function isJoinRateLimited(ip, now = Date.now()) {
+    if (joinAttempts.size > 5000) {
+        for (const [key, attempts] of joinAttempts) {
+            if (!attempts.some(timestamp => now - timestamp < JOIN_ATTEMPT_WINDOW_MS)) {
+                joinAttempts.delete(key);
+            }
+        }
+    }
+
+    const key = ip || "unknown";
+    const recentAttempts = (joinAttempts.get(key) || [])
+        .filter(timestamp => now - timestamp < JOIN_ATTEMPT_WINDOW_MS);
+    if (recentAttempts.length >= MAX_JOIN_ATTEMPTS) {
+        joinAttempts.set(key, recentAttempts);
+        return true;
+    }
+    recentAttempts.push(now);
+    joinAttempts.set(key, recentAttempts);
+    return false;
+}
+
+async function passwordsMatch(candidate, expected) {
+    const encoder = new TextEncoder();
+    const [candidateHash, expectedHash] = await Promise.all([
+        crypto.subtle.digest("SHA-256", encoder.encode(candidate)),
+        crypto.subtle.digest("SHA-256", encoder.encode(expected))
+    ]);
+    const candidateBytes = new Uint8Array(candidateHash);
+    const expectedBytes = new Uint8Array(expectedHash);
+    let difference = 0;
+    for (let index = 0; index < candidateBytes.length; index += 1) {
+        difference |= candidateBytes[index] ^ expectedBytes[index];
+    }
+    return difference === 0;
+}
+
 export default {
     async fetch(request, env) {
         const origin = request.headers.get("Origin") || "";
@@ -137,9 +177,11 @@ export default {
         };
 
         if (!isAllowedOrigin) return jsonResponse({ error: "This website is not allowed to use the AI service." }, 403, corsHeaders);
-        if (path !== "/api/chat" && path !== "/api/image") return jsonResponse({ error: "Not found." }, 404, corsHeaders);
+        if (!["/api/chat", "/api/image", "/api/join/verify"].includes(path)) {
+            return jsonResponse({ error: "Not found." }, 404, corsHeaders);
+        }
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-        if (request.method !== "POST") return jsonResponse({ error: "Use POST to send a chat request." }, 405, corsHeaders);
+        if (request.method !== "POST") return jsonResponse({ error: "Use POST to send this request." }, 405, corsHeaders);
 
         const token = request.headers.get("X-Firebase-AppCheck");
         if (!token) return jsonResponse({ error: "A valid Firebase App Check token is required.", code: "app_check_rejected" }, 401, corsHeaders);
@@ -153,6 +195,21 @@ export default {
             return jsonResponse({ error: "App Check verification is temporarily unavailable. Please try again shortly.", code: "app_check_unavailable" }, 503, corsHeaders);
         }
 
+        if (path === "/api/join/verify") {
+            if (!env.JOIN_PASSWORD) {
+                return jsonResponse({
+                    error: "Join verification is not configured yet. Please try again later.",
+                    code: "join_verification_unavailable"
+                }, 503, corsHeaders);
+            }
+            if (isJoinRateLimited(request.headers.get("CF-Connecting-IP"))) {
+                return jsonResponse({
+                    error: "Too many attempts. Please wait 15 minutes before trying again.",
+                    code: "join_rate_limited"
+                }, 429, corsHeaders);
+            }
+        }
+
         let body;
         try {
             const requestBody = await request.text();
@@ -162,6 +219,24 @@ export default {
             body = JSON.parse(requestBody);
         } catch {
             return jsonResponse({ error: "Send a valid JSON request." }, 400, corsHeaders);
+        }
+
+        if (path === "/api/join/verify") {
+            if (typeof body?.password !== "string" ||
+                !body.password.trim() ||
+                body.password.length > MAX_JOIN_PASSWORD_LENGTH) {
+                return jsonResponse({
+                    error: `Enter an invite password no longer than ${MAX_JOIN_PASSWORD_LENGTH} characters.`,
+                    code: "invalid_join_password"
+                }, 400, corsHeaders);
+            }
+            if (!await passwordsMatch(body.password, env.JOIN_PASSWORD)) {
+                return jsonResponse({
+                    error: "That invite password is not correct. Please try again.",
+                    code: "join_password_rejected"
+                }, 401, corsHeaders);
+            }
+            return jsonResponse({ verified: true }, 200, corsHeaders);
         }
 
         if (path === "/api/image") {

@@ -10,6 +10,7 @@ const env = {
     FIREBASE_PROJECT_NUMBER: projectNumber,
     FIREBASE_APP_ID: appId,
     ALLOWED_ORIGINS: "https://niti-ai-2ba5d.web.app",
+    JOIN_PASSWORD: "test-only-invite-password",
     AI_MODEL: "@cf/meta/llama-3.2-3b-instruct",
     IMAGE_MODEL: "@cf/black-forest-labs/flux-1-schnell",
     AI: {
@@ -44,11 +45,12 @@ async function makeToken(overrides = {}) {
     return `${unsigned}.${Buffer.from(signature).toString("base64url")}`;
 }
 
-function makeRequest({ token, origin = "https://niti-ai-2ba5d.web.app", path = "/api/chat", body = { messages: [{ role: "user", content: "Hello" }] } } = {}) {
+function makeRequest({ token, origin = "https://niti-ai-2ba5d.web.app", path = "/api/chat", ip = "192.0.2.1", body = { messages: [{ role: "user", content: "Hello" }] } } = {}) {
     return new Request(`https://niti-ai-chat.example.workers.dev${path}`, {
         method: "POST",
         headers: {
             Origin: origin,
+            "CF-Connecting-IP": ip,
             ...(token ? { "X-Firebase-AppCheck": token } : {}),
             "Content-Type": "application/json"
         },
@@ -153,6 +155,66 @@ test("requires App Check for image generation", async () => {
     }), env);
     assert.equal(response.status, 401);
     assert.equal((await response.json()).code, "app_check_rejected");
+});
+
+test("verifies a join invite password only through the protected backend", async () => {
+    const token = await makeToken();
+    const accepted = await worker.fetch(makeRequest({
+        token,
+        path: "/api/join/verify",
+        ip: "192.0.2.10",
+        body: { password: env.JOIN_PASSWORD }
+    }), env);
+    assert.equal(accepted.status, 200);
+    assert.deepEqual(await accepted.json(), { verified: true });
+    assert.equal(accepted.headers.get("Cache-Control"), "no-store");
+
+    const rejected = await worker.fetch(makeRequest({
+        token,
+        path: "/api/join/verify",
+        ip: "192.0.2.10",
+        body: { password: "wrong-password" }
+    }), env);
+    assert.equal(rejected.status, 401);
+    assert.equal((await rejected.json()).code, "join_password_rejected");
+});
+
+test("rejects join verification without App Check or backend configuration", async () => {
+    const missingToken = await worker.fetch(makeRequest({
+        path: "/api/join/verify",
+        body: { password: env.JOIN_PASSWORD }
+    }), env);
+    assert.equal(missingToken.status, 401);
+
+    const missingPassword = await worker.fetch(makeRequest({
+        token: await makeToken(),
+        path: "/api/join/verify",
+        ip: "192.0.2.11",
+        body: { password: "test-password" }
+    }), { ...env, JOIN_PASSWORD: "" });
+    assert.equal(missingPassword.status, 503);
+    assert.equal((await missingPassword.json()).code, "join_verification_unavailable");
+});
+
+test("limits repeated invite password attempts", async () => {
+    const token = await makeToken();
+    const attemptEnv = { ...env };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        const response = await worker.fetch(makeRequest({
+            token,
+            path: "/api/join/verify",
+            ip: "192.0.2.12",
+            body: { password: "wrong-password" }
+        }), attemptEnv);
+        assert.equal(response.status, 401);
+    }
+    const limited = await worker.fetch(makeRequest({
+        token,
+        path: "/api/join/verify",
+        ip: "192.0.2.12",
+        body: { password: env.JOIN_PASSWORD }
+    }), attemptEnv);
+    assert.equal(limited.status, 429);
 });
 
 test("returns a clear rate-limit response when Workers AI image quota is exhausted", async () => {
