@@ -257,8 +257,10 @@
                 <input
                     type="search"
                     id="creatorSearch"
-                    placeholder="🔍 Search by name, skill, role, or city..."
+                    list="creatorSearchSuggestions"
+                    placeholder="🔍 Search creators by name, skill, or city..."
                     oninput="searchCreators(this.value)">
+                <datalist id="creatorSearchSuggestions"></datalist>
                 <button type="submit">Search</button>
                 <div class="creator-filter-grid" aria-label="Filter creators">
                     <div class="creator-filter-field">

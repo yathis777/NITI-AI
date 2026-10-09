@@ -156,6 +156,18 @@ function populateCreatorCheckboxFilter(id, values, name) {
 }
 
 function initializeCreatorFilters() {
+    const searchSuggestions = document.getElementById("creatorSearchSuggestions");
+    if (searchSuggestions) {
+        const suggestions = [...new Set(creators.flatMap(creator => [
+            creator.location,
+            ...creator.skills
+        ]).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+        searchSuggestions.replaceChildren(...suggestions.map(value => {
+            const option = document.createElement("option");
+            option.value = value;
+            return option;
+        }));
+    }
     populateCreatorCheckboxFilter("creatorSkillFilter", creators.flatMap(creator => creator.skills), "creator-skill-option");
     populateCreatorCheckboxFilter(
         "creatorToolFilter",
